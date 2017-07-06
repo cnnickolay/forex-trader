@@ -2,27 +2,28 @@ package org.nikosoft.oanda.instruments
 
 import java.time.Instant
 
-import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, MACDCandleCloseIndicator, SMACandleCloseIndicator}
+import org.nikosoft.oanda.instruments.Model._
 import org.scalatest.{FunSpec, Matchers}
 
 class Model$Test extends FunSpec with Matchers {
 
-  def checkNumbersMatch: (BigDecimal, BigDecimal) => Unit = (actual, expected) => actual shouldBe expected +- 0.001
+  def checkNumbersMatch: (BigDecimal, BigDecimal) => Unit = (actual, expected) => actual shouldBe expected +- 0.01
 
   describe("SMA") {
     it("should calculate simple moving average") {
-      val indicator = new SMACandleCloseIndicator(12)
+      val indicator = new SMACandleCloseIndicator(10)
       val chart = new Chart(indicators = Seq(indicator))
 
-      val candleValues: Seq[BigDecimal] = Seq(430.58, 425.66, 431.14, 420.05, 430.47, 441.4, 444.57, 448.97, 442.8, 450.81, 446.06, 448.85, 459.99)
+      val candleValues: Seq[BigDecimal] = Seq(22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29, 22.15, 22.39, 22.38, 22.61, 23.36, 24.05, 23.75, 23.83)
+      val expected: Seq[BigDecimal] = Seq(22.22, 22.21, 22.23, 22.26, 22.31, 22.42, 22.61, 22.77, 22.91)
       candleValues
         .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
+        .reverse
         .foreach(chart.addCandleStick)
 
-      val expectedValues: Seq[BigDecimal] = Seq(440.8975, 438.4467)
       val actualValues = indicator._values
-      actualValues should have size 2
-      (actualValues, expectedValues).zipped.foreach(checkNumbersMatch)
+      actualValues should have size expected.size
+      (actualValues, expected).zipped.foreach(checkNumbersMatch)
     }
   }
 
@@ -66,7 +67,36 @@ class Model$Test extends FunSpec with Matchers {
 
   describe("EMA") {
     it("should calculate exponential moving average") {
-      
+      val prices: Seq[BigDecimal] = Seq(22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29, 22.15, 22.39, 22.38, 22.61, 23.36, 24.05, 23.75, 23.83)
+      val expectedEma: Seq[BigDecimal] = Seq(23.13, 22.97, 22.80, 22.52, 22.33, 22.27, 22.24, 22.21, 22.22)
+
+      val indicator = new EMACandleCloseIndicator(10)
+      val chart = new Chart(indicators = Seq(indicator))
+      prices
+        .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
+        .foreach(chart.addCandleStick)
+
+      val actualEma = indicator._values
+      actualEma should have size expectedEma.size
+      (actualEma, expectedEma).zipped.foreach(checkNumbersMatch)
+    }
+  }
+
+  describe("RSI") {
+    it("should calculate Relative Strength Index") {
+      val prices: Seq[BigDecimal] = Seq(44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.00, 46.03, 46.41, 46.22, 45.64, 46.21, 46.25)
+      val expected: Seq[BigDecimal] = Seq(63.26, 62.93, 57.97, 66.36, 69.41, 66.55, 66.32, 70.53)
+
+      val indicator = new RSICandleCloseIndicator(14)
+      val chart = new Chart(indicators = Seq(indicator))
+      prices
+        .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
+        .foreach(chart.addCandleStick)
+
+      val actual = indicator._values
+      actual should have size expected.size
+      (actual, expected).zipped.foreach(checkNumbersMatch)
+
     }
   }
 

@@ -39,10 +39,9 @@ object Model {
     val indicatorType = SMAIndicator
   }
   class EMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
-    protected def enrichFunction: (Seq[CandleStick]) => Option[BigDecimal] = {
-      case candles @ lastCandle +: _ => indicatorType((period, lastCandle.close, _values.headOption, candles.take(period).map(_.close)))
-      case _ => None
-    }
+    protected def enrichFunction: (Seq[CandleStick]) => Option[BigDecimal] =
+      candles => candles.headOption.flatMap(candle => indicatorType((period, candle.close, _values.headOption, candles.take(period).map(_.close))))
+
     val indicatorType = EMAIndicator
   }
   class RSICandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {

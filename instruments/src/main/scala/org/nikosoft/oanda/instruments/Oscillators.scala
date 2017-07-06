@@ -1,11 +1,12 @@
 package org.nikosoft.oanda.instruments
 
+import scalaz.Scalaz._
+
 object Oscillators {
 
-  def rsi(period: Int, values: Seq[BigDecimal]): Option[BigDecimal] =
-    if (values.size < period) None
+  def rsi(period: Int, values: Seq[BigDecimal]): Option[(BigDecimal, BigDecimal, BigDecimal)] =
+    if (values.size < period + 1) None
     else {
-
       val diffs = values
         .take(period + 1)
         .reverse
@@ -13,16 +14,32 @@ object Oscillators {
         .toList
         .map { case Seq(_this, _that) => _that - _this }
 
-      val negative = -diffs.filter(_ < 0).sum / period
-      val positive = diffs.filter(_ > 0).sum / period
+      val loss = -diffs.filter(_ < 0).sum / period
+      val gain = diffs.filter(_ > 0).sum / period
 
-      val rs = positive / negative
+      val rs = gain / loss
       val rsi: BigDecimal = 100 - (100.0 / (1.0 + rs))
-      Option(rsi)
+      Option(rsi, gain, loss)
     }
 
+  def _rsi(period: Int, avgGainLoss: Option[(BigDecimal, BigDecimal)], values: Seq[BigDecimal]): Option[(BigDecimal, BigDecimal, BigDecimal)] =
+    avgGainLoss.fold[Option[(BigDecimal, BigDecimal, BigDecimal)]] {
+      rsi(period, values)
+    }
+    { case (prevAvgGain, prevAvgLoss) =>
+      val price +: prevPrice +: _ = values
+      val gain = (price > prevPrice) ? (price - prevPrice) | 0
+      val loss = (price < prevPrice) ? (prevPrice - price) | 0
+      val avgGain = (prevAvgGain * (period - 1) + gain) / period
+      val avgLoss = (prevAvgLoss * (period - 1) + loss) / period
+      val rs = avgGain / avgLoss
+      val rsi: BigDecimal = 100 - (100.0 / (1.0 + rs))
+      (rsi, avgGain, avgLoss).some
+    }
+
+
   case class MACDItem(price: BigDecimal, ema12: Option[BigDecimal] = None, ema26: Option[BigDecimal] = None, macd: Option[BigDecimal] = None, signalLine: Option[BigDecimal] = None) {
-    val histogram: Option[BigDecimal] = for (macdValue <- macd; signalLineValue <- signalLine) yield macdValue - signalLineValue
+    val histogram: Option[BigDecimal] = (macd |@| signalLine) (_ - _)
   }
 
   def macd(currentValue: BigDecimal, prevMacd: Seq[MACDItem] = Seq.empty): MACDItem = {
