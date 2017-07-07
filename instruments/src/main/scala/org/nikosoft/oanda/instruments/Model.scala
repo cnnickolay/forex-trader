@@ -1,6 +1,7 @@
 package org.nikosoft.oanda.instruments
 
 import java.time.Instant
+import scalaz.Scalaz._
 
 import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
@@ -45,7 +46,11 @@ object Model {
     val indicatorType = EMAIndicator
   }
   class RSICandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
-    protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => indicatorType((period, candles.map(_.close)))
+    protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles =>
+      indicatorType((period, gainLoss, candles.map(_.close))).map { case (rsi, gain, loss) =>
+        gainLoss = (gain, loss).some
+        rsi
+      }
     val indicatorType = RSIIndicator
   }
   class MACDCandleCloseIndicator extends Indicator[Seq[CandleStick], MACDItem] {
