@@ -16,7 +16,7 @@ object Model {
     def apply(input: (Int, Seq[BigDecimal])): Option[BigDecimal] = Smoothing.sma(input._1, input._2)
   }
   case object RSIIndicator extends IndicatorType[(Int, Option[(BigDecimal, BigDecimal)], Seq[BigDecimal]), (BigDecimal, BigDecimal, BigDecimal)] {
-    def apply(input: (Int, Option[(BigDecimal, BigDecimal)], Seq[BigDecimal])): Option[(BigDecimal, BigDecimal, BigDecimal)] = (Oscillators._rsi _).tupled(input)
+    def apply(input: (Int, Option[(BigDecimal, BigDecimal)], Seq[BigDecimal])): Option[(BigDecimal, BigDecimal, BigDecimal)] = (Oscillators.rsi _).tupled(input)
   }
   case object MACDIndicator extends IndicatorType[(BigDecimal, Seq[MACDItem]), MACDItem] {
     def apply(input: (BigDecimal, Seq[MACDItem])): Option[MACDItem] = Some((Oscillators.macd _).tupled(input))
