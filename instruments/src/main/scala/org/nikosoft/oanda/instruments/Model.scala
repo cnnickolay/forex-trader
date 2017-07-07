@@ -1,8 +1,8 @@
 package org.nikosoft.oanda.instruments
 
-import java.time.Instant
-import scalaz.Scalaz._
+import org.joda.time.Instant
 
+import scalaz.Scalaz._
 import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 object Model {

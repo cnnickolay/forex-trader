@@ -1,16 +1,15 @@
 package org.nikosoft.oanda.bot
 
-import akka.actor.{Actor, ActorRef, PoisonPill}
+import akka.actor.{Actor, PoisonPill}
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.bot.CommonCommands.{StartActor, StopActor}
 
-import scala.concurrent.Future
-import scalaz.{-\/, \/-}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
-class InstrumentStreamingActor(accountId: String, instrument: String, receiver: ActorRef) extends Actor {
+class InstrumentStreamingActor(accountId: String, instrument: String) extends Actor {
 
   var terminate = false
 
@@ -18,10 +17,7 @@ class InstrumentStreamingActor(accountId: String, instrument: String, receiver: 
     case StartActor =>
       Future {
         val stream = Api.pricingApi.pricingStream(AccountID(accountId), Seq(InstrumentName(instrument)), snapshot = true, terminate = terminate)
-        Iterator.continually(stream.take()).foreach {
-          case \/-(price) => receiver ! price
-          case -\/(_) =>
-        }
+        Iterator.continually(stream.take()).foreach(_.foreach(context.actorSelection("../router") ! _))
       }
     case StopActor =>
       println("Shutting down")
