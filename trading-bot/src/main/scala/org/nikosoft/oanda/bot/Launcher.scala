@@ -4,7 +4,7 @@ import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorSystem, Props}
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.PricingModel.Price
-import org.nikosoft.oanda.bot.SimpleCommands.{Start, Stop}
+import org.nikosoft.oanda.bot.CommonCommands.{StartActor, StopActor}
 
 class PriceConsumer extends Actor {
   def receive: Receive = {
@@ -20,5 +20,5 @@ object Launcher extends App {
   val traderActor = actorSystem.actorOf(Props.create(classOf[TraderActor], "001-004-1442547-003", "EUR_USD"), "trader-actor")
   val instrumentActor = actorSystem.actorOf(Props.create(classOf[InstrumentStreamingActor], "001-004-1442547-003", "EUR_USD", traderActor), "instrument-streaming")
 
-  instrumentActor ! Start
+  instrumentActor ! StartActor
 }

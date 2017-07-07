@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, PoisonPill}
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
-import org.nikosoft.oanda.bot.SimpleCommands.{Start, Stop}
+import org.nikosoft.oanda.bot.CommonCommands.{StartActor, StopActor}
 
 import scala.concurrent.Future
 import scalaz.{-\/, \/-}
@@ -15,7 +15,7 @@ class InstrumentStreamingActor(accountId: String, instrument: String, receiver: 
   var terminate = false
 
   def receive: Receive = {
-    case Start =>
+    case StartActor =>
       Future {
         val stream = Api.pricingApi.pricingStream(AccountID(accountId), Seq(InstrumentName(instrument)), snapshot = true, terminate = terminate)
         Iterator.continually(stream.take()).foreach {
@@ -23,7 +23,7 @@ class InstrumentStreamingActor(accountId: String, instrument: String, receiver: 
           case -\/(_) =>
         }
       }
-    case Stop =>
+    case StopActor =>
       println("Shutting down")
       terminate = true
       self ! PoisonPill
