@@ -8,22 +8,19 @@ import scalaz.Scalaz._
 class Oscillators$Test extends FunSpec with Matchers {
 
   describe("rsi") {
-
     implicit val rounder = DefaultBigDecimalRounder(2)
 
     it("should calculate rsi for array of values") {
       val input: Seq[BigDecimal] = Seq(46.28, 46.28, 45.61, 46.03, 45.89, 46.08, 45.84, 45.42, 45.10, 44.83, 44.33, 43.61, 44.15, 44.09, 44.34)
       val expected: BigDecimal = 70.46
-      val actual = rsi(14, input)
-      actual.fold(fail("Should not be None")) { actualValue =>
+      val actual = rsi(14, None, input)
+      actual.fold(fail("Should not be None")) { case (actualValue, _, _) =>
         actualValue shouldBe (expected +- 1e-2)
       }
     }
-
   }
 
   describe("macd") {
-
     implicit def toOptional(value: Double): Option[BigDecimal] = BigDecimal.valueOf(value).some
     val tolerance = 0.0000001
 

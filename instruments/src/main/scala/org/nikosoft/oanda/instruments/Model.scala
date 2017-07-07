@@ -23,7 +23,6 @@ object Model {
   }
 
   abstract class Indicator[INPUT, OUTPUT] extends (INPUT => Seq[OUTPUT]) {
-    val indicatorType: IndicatorType[_, OUTPUT]
     protected var values: Seq[OUTPUT] = Seq.empty
     protected def enrichFunction: INPUT => Option[OUTPUT]
     def apply(input: INPUT): Seq[OUTPUT] = {
@@ -36,26 +35,22 @@ object Model {
   }
 
   class SMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
-    protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => indicatorType((period, candles.map(_.close)))
-    val indicatorType = SMAIndicator
+    protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => SMAIndicator((period, candles.map(_.close)))
   }
   class EMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: (Seq[CandleStick]) => Option[BigDecimal] =
-      candles => candles.headOption.flatMap(candle => indicatorType((period, candle.close, _values.headOption, candles.take(period).map(_.close))))
-
-    val indicatorType = EMAIndicator
+      candles => candles.headOption.flatMap(candle => EMAIndicator((period, candle.close, _values.headOption, candles.take(period).map(_.close))))
   }
   class RSICandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
+    var gainLoss: Option[(BigDecimal, BigDecimal)] = None
     protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles =>
-      indicatorType((period, gainLoss, candles.map(_.close))).map { case (rsi, gain, loss) =>
+      RSIIndicator((period, gainLoss, candles.map(_.close))).map { case (rsi, gain, loss) =>
         gainLoss = (gain, loss).some
         rsi
       }
-    val indicatorType = RSIIndicator
   }
   class MACDCandleCloseIndicator extends Indicator[Seq[CandleStick], MACDItem] {
-    protected def enrichFunction: Seq[CandleStick] => Option[MACDItem] = candles => candles.headOption.flatMap(candle => indicatorType((candle.close, _values)))
-    val indicatorType = MACDIndicator
+    protected def enrichFunction: Seq[CandleStick] => Option[MACDItem] = candles => candles.headOption.flatMap(candle => MACDIndicator((candle.close, _values)))
   }
 
   case class CandleStick(time: Instant,

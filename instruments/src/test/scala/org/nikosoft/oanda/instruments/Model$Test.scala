@@ -7,7 +7,7 @@ import org.scalatest.{FunSpec, Matchers}
 
 class Model$Test extends FunSpec with Matchers {
 
-  def checkNumbersMatch: (BigDecimal, BigDecimal) => Unit = (actual, expected) => actual shouldBe expected +- 0.01
+  def checkNumbersMatch(tolerance: Double = 0.01): (BigDecimal, BigDecimal) => Unit = (actual, expected) => actual shouldBe expected +- tolerance
 
   describe("SMA") {
     it("should calculate simple moving average") {
@@ -23,7 +23,7 @@ class Model$Test extends FunSpec with Matchers {
 
       val actualValues = indicator._values
       actualValues should have size expected.size
-      (actualValues, expected).zipped.foreach(checkNumbersMatch)
+      (actualValues, expected).zipped.foreach(checkNumbersMatch())
     }
   }
 
@@ -45,23 +45,23 @@ class Model$Test extends FunSpec with Matchers {
 
       val actualEma12 = indicator._values.flatMap(_.ema12)
       actualEma12 should have size expectedEma12.size
-      (actualEma12, expectedEma12).zipped.foreach(checkNumbersMatch)
+      (actualEma12, expectedEma12).zipped.foreach(checkNumbersMatch())
 
       val actualEma26 = indicator._values.flatMap(_.ema26)
       actualEma26 should have size expectedEma26.size
-      (actualEma26, expectedEma26).zipped.foreach(checkNumbersMatch)
+      (actualEma26, expectedEma26).zipped.foreach(checkNumbersMatch())
 
       val actualMacd = indicator._values.flatMap(_.macd)
       actualMacd should have size expectedMacd.size
-      (actualMacd, expectedMacd).zipped.foreach(checkNumbersMatch)
+      (actualMacd, expectedMacd).zipped.foreach(checkNumbersMatch())
 
       val actualSignalLine = indicator._values.flatMap(_.signalLine)
       actualSignalLine should have size expectedSignalLine.size
-      (actualSignalLine, expectedSignalLine).zipped.foreach(checkNumbersMatch)
+      (actualSignalLine, expectedSignalLine).zipped.foreach(checkNumbersMatch())
 
       val actualHistogram = indicator._values.flatMap(_.histogram)
       actualHistogram should have size expectedHistogram.size
-      (actualHistogram, expectedHistogram).zipped.foreach(checkNumbersMatch)
+      (actualHistogram, expectedHistogram).zipped.foreach(checkNumbersMatch())
     }
   }
 
@@ -78,7 +78,7 @@ class Model$Test extends FunSpec with Matchers {
 
       val actualEma = indicator._values
       actualEma should have size expectedEma.size
-      (actualEma, expectedEma).zipped.foreach(checkNumbersMatch)
+      (actualEma, expectedEma).zipped.foreach(checkNumbersMatch())
     }
   }
 
@@ -95,7 +95,7 @@ class Model$Test extends FunSpec with Matchers {
 
       val actual = indicator._values
       actual should have size expected.size
-      (actual, expected).zipped.foreach(checkNumbersMatch)
+      (actual, expected).zipped.foreach(checkNumbersMatch(0.1))
 
     }
   }
