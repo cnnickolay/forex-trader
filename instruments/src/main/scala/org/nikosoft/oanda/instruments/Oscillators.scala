@@ -40,7 +40,7 @@ object Oscillators {
   def macd(currentValue: BigDecimal, prevMacd: Seq[MACDItem] = Seq.empty): MACDItem = {
     val ema12 = Smoothing.ema(12, currentValue, prevMacd.headOption.flatMap(_.ema12), currentValue +: prevMacd.take(11).map(_.price))
     val ema26 = Smoothing.ema(26, currentValue, prevMacd.headOption.flatMap(_.ema26), currentValue +: prevMacd.take(25).map(_.price))
-    val macd = for(ema12Value <- ema12; ema26Value <- ema26) yield ema12Value - ema26Value
+    val macd = (ema12 |@| ema26) (_ - _)
     val signalLine = macd.flatMap(macdValue => Smoothing.ema(9, macdValue, prevMacd.headOption.flatMap(_.signalLine), macdValue +: prevMacd.take(8).flatMap(_.macd)))
     MACDItem(currentValue, ema12, ema26, macd, signalLine)
   }
