@@ -1,9 +1,11 @@
 package org.nikosoft.oanda.instruments
 
-import java.time.Instant
-
+import org.apache.commons.lang3.RandomUtils
+import org.joda.time.Instant
 import org.nikosoft.oanda.instruments.Model._
 import org.scalatest.{FunSpec, Matchers}
+
+import scala.util.Random
 
 class Model$Test extends FunSpec with Matchers {
 
@@ -100,4 +102,29 @@ class Model$Test extends FunSpec with Matchers {
     }
   }
 
+  describe("Chart") {
+    it("should ignore candle if it's already in the list of candles") {
+      val chart = new Chart()
+      val candle = aCandleStick.copy(complete = true)
+
+      chart._candles should have size 0
+      chart.addCandleStick(candle) shouldBe Some(candle)
+      chart._candles should have size 1
+      chart.addCandleStick(candle) shouldBe None
+      chart._candles should have size 1
+    }
+
+    it("should not add not complete candle") {
+      val chart = new Chart()
+      val candle = aCandleStick.copy(complete = false)
+
+      chart._candles should have size 0
+      chart.addCandleStick(candle) shouldBe None
+      chart._candles should have size 0
+    }
+  }
+
+  def aCandleStick: CandleStick = {
+    CandleStick(Instant.now(), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), RandomUtils.nextLong(), complete = false)
+  }
 }

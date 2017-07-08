@@ -3,6 +3,8 @@ package org.nikosoft.oanda.instruments
 import org.joda.time.Instant
 
 import scalaz.Scalaz._
+import scalaz._
+import Scalaz._
 import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 object Model {
@@ -61,11 +63,22 @@ object Model {
                          volume: Long,
                          complete: Boolean)
 
-  class Chart(private var candles: Seq[CandleStick] = Seq.empty, val indicators: Seq[Indicator[Seq[CandleStick], _]]) {
-    def addCandleStick(candle: CandleStick) = {
-      candles = candle +: candles
-      indicators.foreach(indicator => indicator(candles))
+  class Chart(private var candles: Seq[CandleStick] = Seq.empty, val indicators: Seq[Indicator[Seq[CandleStick], _]] = Seq.empty) {
+    def addCandleStick(candle: CandleStick): Option[CandleStick] = {
+      def add(candle: CandleStick): Option[CandleStick] = Option(candle.complete).collect { case true => // looks crappy, I know
+        candles = candle +: candles
+        indicators.foreach(indicator => indicator(candles))
+        candle
+      }
+
+      candles match {
+        case Nil => add(candle)
+        case lastCandle +: Nil if lastCandle != candle => add(candle)
+        case _ => None
+      }
     }
+
+    def _candles = candles
   }
 
 }
