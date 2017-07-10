@@ -1,22 +1,25 @@
 package org.nikosoft.oanda.bot
 
-import akka.actor.{Actor, Props}
-import akka.routing.{BroadcastRoutingLogic, Router}
+import akka.actor.{Actor, ActorRef, Props}
+import org.nikosoft.oanda.instruments.Model.Chart
 
 object ManagerActor {
-  def instrumentStreamingActorProps(accountId: String, instrument: String) = Props.create(classOf[InstrumentStreamingActor], accountId, instrument)
-  def candleStreamingActorProps(accountId: String, instrument: String) = Props.create(classOf[CandleStreamingActor], accountId, instrument)
+  def instrumentStreamingActorProps(next: ActorRef, chart: Chart) = Props.create(classOf[InstrumentStreamingActor], next, chart: Chart)
+  def candleStreamingActorProps(next: ActorRef, chart: Chart) = Props.create(classOf[CandleStreamingActor], next, chart: Chart)
+  def advisorActorProps(chart: Chart) = Props.create(classOf[AdvisorActor], chart)
 }
 
-class ManagerActor(accountId: String, instrument: String) extends Actor {
+class ManagerActor(chart: Chart) extends Actor {
   import ManagerActor._
 
-  def receive = throw new RuntimeException("not supposed to receive messages")
+  def receive = {
+    case unexpectedEvent => throw new RuntimeException(s"not supposed to receive messages, but has received $unexpectedEvent")
+  }
 
   override def preStart(): Unit = {
-    Router(BroadcastRoutingLogic(), /*Vector(ActorRefRoutee())*/)
+    val advisorActor = context.actorOf(advisorActorProps(chart))
 
-    val instrumentStreamingActor = context.actorOf(instrumentStreamingActorProps(accountId, instrument))
-    val candleStreamingActor = context.actorOf(candleStreamingActorProps(accountId, instrument))
+//    val instrumentStreamingActor = context.actorOf(instrumentStreamingActorProps(advisorActor, accountId, instrument))
+    val candleStreamingActor = context.actorOf(candleStreamingActorProps(advisorActor, chart))
   }
 }
