@@ -2,6 +2,7 @@ package org.nikosoft.oanda.instruments
 
 import org.apache.commons.lang3.RandomUtils
 import org.joda.time.Instant
+import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity.M5
 import org.nikosoft.oanda.instruments.Model._
 import org.scalatest.{FunSpec, Matchers}
 
@@ -14,7 +15,7 @@ class Model$Test extends FunSpec with Matchers {
   describe("SMA") {
     it("should calculate simple moving average") {
       val indicator = new SMACandleCloseIndicator(10)
-      val chart = new Chart(indicators = Seq(indicator))
+      val chart = aChart(indicators = Seq(indicator))
 
       val candleValues: Seq[BigDecimal] = Seq(22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29, 22.15, 22.39, 22.38, 22.61, 23.36, 24.05, 23.75, 23.83)
       val expected: Seq[BigDecimal] = Seq(22.22, 22.21, 22.23, 22.26, 22.31, 22.42, 22.61, 22.77, 22.91)
@@ -39,7 +40,7 @@ class Model$Test extends FunSpec with Matchers {
       val expectedHistogram: Seq[BigDecimal] = Seq(-2.25061327856795, -2.5922724401365, -3.38777517583258, -4.52749455759267, -5.10808405882886)
 
       val indicator = new MACDCandleCloseIndicator()
-      val chart = new Chart(indicators = Seq(indicator))
+      val chart = aChart(indicators = Seq(indicator))
       prices
         .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
         .reverse
@@ -73,7 +74,7 @@ class Model$Test extends FunSpec with Matchers {
       val expectedEma: Seq[BigDecimal] = Seq(23.13, 22.97, 22.80, 22.52, 22.33, 22.27, 22.24, 22.21, 22.22)
 
       val indicator = new EMACandleCloseIndicator(10)
-      val chart = new Chart(indicators = Seq(indicator))
+      val chart = aChart(indicators = Seq(indicator))
       prices
         .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
         .foreach(chart.addCandleStick)
@@ -90,7 +91,7 @@ class Model$Test extends FunSpec with Matchers {
       val expected: Seq[BigDecimal] = Seq(63.26, 62.93, 57.97, 66.36, 69.41, 66.55, 66.32, 70.53)
 
       val indicator = new RSICandleCloseIndicator(14)
-      val chart = new Chart(indicators = Seq(indicator))
+      val chart = aChart(indicators = Seq(indicator))
       prices
         .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
         .foreach(chart.addCandleStick)
@@ -104,7 +105,7 @@ class Model$Test extends FunSpec with Matchers {
 
   describe("Chart") {
     it("should ignore candle if it's already in the list of candles") {
-      val chart = new Chart()
+      val chart = aChart()
       val candle = aCandleStick.copy(complete = true)
 
       chart._candles should have size 0
@@ -115,16 +116,28 @@ class Model$Test extends FunSpec with Matchers {
     }
 
     it("should not add not complete candle") {
-      val chart = new Chart()
+      val chart = aChart()
       val candle = aCandleStick.copy(complete = false)
 
       chart._candles should have size 0
       chart.addCandleStick(candle) shouldBe None
       chart._candles should have size 0
     }
+
+    it("only candles with future dates can be added, i.e. no past candles can be added") {
+      val chart = aChart()
+      val candle = aCandleStick.copy(complete = true)
+      val pastCandle = candle.copy(time = candle.time.minus(1))
+
+      chart._candles should have size 0
+      chart.addCandleStick(candle) shouldBe Some(candle)
+      chart._candles should have size 1
+      chart.addCandleStick(pastCandle) shouldBe None
+      chart._candles should have size 1
+    }
   }
 
-  def aCandleStick: CandleStick = {
-    CandleStick(Instant.now(), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), RandomUtils.nextLong(), complete = false)
-  }
+  def aCandleStick = CandleStick(Instant.now(), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), RandomUtils.nextLong(), complete = false)
+
+  def aChart[A](indicators: Seq[Indicator[Seq[CandleStick], A]] = Seq.empty) = new Chart(accountId = "123", instrument = "EUR_USD", granularity = M5, indicators = indicators)
 }

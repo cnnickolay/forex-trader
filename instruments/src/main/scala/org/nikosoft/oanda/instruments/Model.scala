@@ -1,6 +1,7 @@
 package org.nikosoft.oanda.instruments
 
 import org.joda.time.Instant
+import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity.CandlestickGranularity
 
 import scalaz.Scalaz._
 import scalaz._
@@ -63,17 +64,23 @@ object Model {
                          volume: Long,
                          complete: Boolean)
 
-  class Chart(private var candles: Seq[CandleStick] = Seq.empty, val indicators: Seq[Indicator[Seq[CandleStick], _]] = Seq.empty) {
+  class Chart(val accountId: String,
+              val instrument: String,
+              val granularity: CandlestickGranularity,
+              var candles: Seq[CandleStick] = Seq.empty,
+              val indicators: Seq[Indicator[Seq[CandleStick], _]] = Seq.empty) {
+
     def addCandleStick(candle: CandleStick): Option[CandleStick] = {
       def add(candle: CandleStick): Option[CandleStick] = Option(candle.complete).collect { case true => // looks crappy, I know
         candles = candle +: candles
-        indicators.foreach(indicator => indicator(candles))
+//        indicators.foreach(_(candles))
+        indicators.head.apply(candles)
         candle
       }
 
       candles match {
         case Nil => add(candle)
-        case lastCandle +: Nil if lastCandle != candle => add(candle)
+        case lastCandle +: _ if lastCandle != candle && lastCandle.time.isBefore(candle.time) => add(candle)
         case _ => None
       }
     }
