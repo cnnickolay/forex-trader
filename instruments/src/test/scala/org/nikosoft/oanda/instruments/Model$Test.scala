@@ -20,8 +20,9 @@ class Model$Test extends FunSpec with Matchers {
       val candleValues: Seq[BigDecimal] = Seq(22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29, 22.15, 22.39, 22.38, 22.61, 23.36, 24.05, 23.75, 23.83)
       val expected: Seq[BigDecimal] = Seq(22.22, 22.21, 22.23, 22.26, 22.31, 22.42, 22.61, 22.77, 22.91)
       candleValues
-        .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
         .reverse
+        .zipWithIndex
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
         .foreach(chart.addCandleStick)
 
       val actualValues = indicator._values
@@ -42,8 +43,9 @@ class Model$Test extends FunSpec with Matchers {
       val indicator = new MACDCandleCloseIndicator()
       val chart = aChart(indicators = Seq(indicator))
       prices
-        .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
         .reverse
+        .zipWithIndex
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
         .foreach(chart.addCandleStick)
 
       val actualEma12 = indicator._values.flatMap(_.ema12)
@@ -76,7 +78,8 @@ class Model$Test extends FunSpec with Matchers {
       val indicator = new EMACandleCloseIndicator(10)
       val chart = aChart(indicators = Seq(indicator))
       prices
-        .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
+        .zipWithIndex
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
         .foreach(chart.addCandleStick)
 
       val actualEma = indicator._values
@@ -93,7 +96,8 @@ class Model$Test extends FunSpec with Matchers {
       val indicator = new RSICandleCloseIndicator(14)
       val chart = aChart(indicators = Seq(indicator))
       prices
-        .map(CandleStick(Instant.now(), 0, 0, 0, _, 0, complete = true))
+        .zipWithIndex
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
         .foreach(chart.addCandleStick)
 
       val actual = indicator._values

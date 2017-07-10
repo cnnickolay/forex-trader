@@ -73,8 +73,7 @@ object Model {
     def addCandleStick(candle: CandleStick): Option[CandleStick] = {
       def add(candle: CandleStick): Option[CandleStick] = Option(candle.complete).collect { case true => // looks crappy, I know
         candles = candle +: candles
-//        indicators.foreach(_(candles))
-        indicators.head.apply(candles)
+        indicators.foreach(_(candles))
         candle
       }
 
