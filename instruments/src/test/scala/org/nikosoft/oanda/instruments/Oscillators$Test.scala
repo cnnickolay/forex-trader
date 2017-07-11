@@ -1,15 +1,12 @@
 package org.nikosoft.oanda.instruments
 
 import org.scalatest.{FunSpec, Matchers}
-import Converters._
 import org.nikosoft.oanda.instruments.Oscillators.{MACDItem, macd, rsi}
 import scalaz.Scalaz._
 
 class Oscillators$Test extends FunSpec with Matchers {
 
   describe("rsi") {
-    implicit val rounder = DefaultBigDecimalRounder(2)
-
     it("should calculate rsi for array of values") {
       val input: Seq[BigDecimal] = Seq(46.28, 46.28, 45.61, 46.03, 45.89, 46.08, 45.84, 45.42, 45.10, 44.83, 44.33, 43.61, 44.15, 44.09, 44.34)
       val expected: BigDecimal = 70.46

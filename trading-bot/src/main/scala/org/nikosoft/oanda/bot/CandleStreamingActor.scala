@@ -29,14 +29,18 @@ class CandleStreamingActor(next: ActorRef, chart: Chart) extends Actor {
         .candles(
           instrument = InstrumentName(chart.instrument),
           granularity = chart.granularity,
-          count = (chart._candles.isEmpty ? 100 | 2).some
+          count = (chart._candles.isEmpty ? 500 | 2).some
         )
 
       candlesResponse.map(_.candles
         .flatMap(candle => candle.mid.map(toCandleStick(candle, _)))
         .filter(_.complete)
-        .flatMap(chart.addCandleStick).foreach(next ! _)
-      )
+        .flatMap(chart.addCandleStick)
+      ).foreach {
+        case lastCandle +: Nil => next ! lastCandle
+        case candles @ lastCandle +: tail => next ! candles
+        case _ =>
+      }
 
   }
 

@@ -4,7 +4,7 @@ import scalaz.Scalaz._
 
 object Oscillators {
 
-    def rsi(period: Int, avgGainLoss: Option[(BigDecimal, BigDecimal)], values: Seq[BigDecimal]): Option[(BigDecimal, BigDecimal, BigDecimal)] =
+  def rsi(period: Int, avgGainLoss: Option[(BigDecimal, BigDecimal)], values: Seq[BigDecimal]): Option[(BigDecimal, BigDecimal, BigDecimal)] =
     avgGainLoss.fold {
       if (values.size < period + 1) None
       else {
@@ -45,4 +45,7 @@ object Oscillators {
     MACDItem(currentValue, ema12, ema26, macd, signalLine)
   }
 
+  def awesomeOscillator() = ???
+
+  def cmo() = ???
 }

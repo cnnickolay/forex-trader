@@ -22,7 +22,7 @@ class Model$Test extends FunSpec with Matchers {
       candleValues
         .reverse
         .zipWithIndex
-        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true) }
         .foreach(chart.addCandleStick)
 
       val actualValues = indicator._values
@@ -45,7 +45,7 @@ class Model$Test extends FunSpec with Matchers {
       prices
         .reverse
         .zipWithIndex
-        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true) }
         .foreach(chart.addCandleStick)
 
       val actualEma12 = indicator._values.flatMap(_.ema12)
@@ -79,7 +79,7 @@ class Model$Test extends FunSpec with Matchers {
       val chart = aChart(indicators = Seq(indicator))
       prices
         .zipWithIndex
-        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true) }
         .foreach(chart.addCandleStick)
 
       val actualEma = indicator._values
@@ -97,7 +97,7 @@ class Model$Test extends FunSpec with Matchers {
       val chart = aChart(indicators = Seq(indicator))
       prices
         .zipWithIndex
-        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true)}
+        .map { case (price, idx) => CandleStick(Instant.now().plus(idx * 1000), 0, 0, 0, price, 0, complete = true) }
         .foreach(chart.addCandleStick)
 
       val actual = indicator._values
@@ -139,6 +139,30 @@ class Model$Test extends FunSpec with Matchers {
       chart.addCandleStick(pastCandle) shouldBe None
       chart._candles should have size 1
     }
+  }
+
+  describe("ATR") {
+
+    it("should calculate Average True Range and accumulate values") {
+      val indicator = new ATRCandleIndicator(14)
+      val chart = aChart(indicators = Seq(indicator))
+
+      val inputHigh: Seq[BigDecimal] = Seq(48.70, 48.72, 48.90, 48.87, 48.82, 49.05, 49.20, 49.35, 49.92, 50.19, 50.12, 49.66, 49.88, 50.19, 50.36, 50.57, 50.65)
+      val inputLow: Seq[BigDecimal] = Seq(47.79, 48.14, 48.39, 48.37, 48.24, 48.64, 48.94, 48.86, 49.50, 49.87, 49.20, 48.90, 49.43, 49.73, 49.26, 50.09, 50.30)
+      val inputClose: Seq[BigDecimal] = Seq(48.16, 48.61, 48.75, 48.63, 48.74, 49.03, 49.07, 49.32, 49.91, 50.13, 49.53, 49.50, 49.75, 50.03, 50.31, 50.52, 50.41)
+
+      (inputHigh, inputLow, inputClose).zipped.map(CandleStick(Instant.now, 0, _, _, _, 0, complete = true))
+        .zipWithIndex
+        .map { case (candle, idx) => candle.copy(time = Instant.now().plus(idx * 1000)) }
+        .foreach(chart.addCandleStick)
+
+      val expected: Seq[BigDecimal] = Seq(0.57, 0.59, 0.59, 0.56)
+
+      val actualValues = indicator._values
+      actualValues should have size expected.size
+      (actualValues, expected).zipped.foreach(checkNumbersMatch())
+    }
+
   }
 
   def aCandleStick = CandleStick(Instant.now(), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), RandomUtils.nextLong(), complete = false)

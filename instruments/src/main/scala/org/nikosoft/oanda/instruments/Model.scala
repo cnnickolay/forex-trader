@@ -2,16 +2,17 @@ package org.nikosoft.oanda.instruments
 
 import org.joda.time.Instant
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity.CandlestickGranularity
+import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 import scalaz.Scalaz._
-import scalaz._
-import Scalaz._
-import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 object Model {
 
   sealed trait IndicatorType[T, K] extends (T => Option[K])
 
+  case object ATRIndicator extends IndicatorType[(Int, Seq[CandleStick], Option[BigDecimal]), BigDecimal] {
+    def apply(input: (Int, Seq[CandleStick], Option[BigDecimal])): Option[BigDecimal] = (Indicators.atr _).tupled(input)
+  }
   case object EMAIndicator extends IndicatorType[(Int, BigDecimal, Option[BigDecimal], Seq[BigDecimal]), BigDecimal] {
     def apply(input: (Int, BigDecimal, Option[BigDecimal], Seq[BigDecimal])): Option[BigDecimal] = (Smoothing.ema _).tupled(input)
   }
@@ -40,6 +41,9 @@ object Model {
   class SMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => SMAIndicator((period, candles.map(_.close)))
   }
+  class ATRCandleIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
+    protected def enrichFunction: (Seq[CandleStick]) => Option[BigDecimal] = candles => ATRIndicator(period, candles, _values.headOption)
+  }
   class EMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: (Seq[CandleStick]) => Option[BigDecimal] =
       candles => candles.headOption.flatMap(candle => EMAIndicator((period, candle.close, _values.headOption, candles.take(period).map(_.close))))
@@ -67,7 +71,7 @@ object Model {
   class Chart(val accountId: String,
               val instrument: String,
               val granularity: CandlestickGranularity,
-              var candles: Seq[CandleStick] = Seq.empty,
+              private var candles: Seq[CandleStick] = Seq.empty,
               val indicators: Seq[Indicator[Seq[CandleStick], _]] = Seq.empty) {
 
     def addCandleStick(candle: CandleStick): Option[CandleStick] = {
