@@ -49,3 +49,21 @@ object Oscillators {
 
   def cmo() = ???
 }
+
+object CMO {
+
+  def cmo(period: Int, values: Seq[BigDecimal]): Option[BigDecimal] = (values.size >= period).option {
+    val slice = values.take(period)
+    val diffs = slice.sliding(2).map { case (head +: prev +: Nil) => head - prev }.toList
+    val negative = diffs.filter(_ < 0).map(_.abs)
+    val positive = diffs.filter(_ >= 0)
+    val negativeSum = negative.sum
+    val positiveSum = positive.sum
+    val diff = positiveSum - negativeSum
+    val sum = positiveSum + negativeSum
+    val div = diff / sum * 100
+    div
+  }
+
+}
+
