@@ -26,13 +26,13 @@ object Model {
     def apply(input: (BigDecimal, Seq[MACDItem])): Option[MACDItem] = Some((Oscillators.macd _).tupled(input))
   }
 
-  abstract class Indicator[INPUT, OUTPUT] extends (INPUT => Seq[OUTPUT]) {
+  abstract class Indicator[INPUT, OUTPUT] extends (INPUT => Option[OUTPUT]) {
     protected var values: Seq[OUTPUT] = Seq.empty
     protected def enrichFunction: INPUT => Option[OUTPUT]
-    def apply(input: INPUT): Seq[OUTPUT] = {
-      enrichFunction(input).fold(values) { enriched =>
+    def apply(input: INPUT): Option[OUTPUT] = {
+      enrichFunction(input).fold[Option[OUTPUT]](None) { enriched =>
         values = enriched +: values
-        values
+        Some(enriched)
       }
     }
     def _values = values
@@ -66,7 +66,8 @@ object Model {
                          low: BigDecimal,
                          close: BigDecimal,
                          volume: Long,
-                         complete: Boolean)
+                         complete: Boolean,
+                         indicators: Map[Indicator[Seq[CandleStick], _], Any] = Map.empty)
 
   class Chart(val accountId: String,
               val instrument: String,
@@ -75,10 +76,11 @@ object Model {
               val indicators: Seq[Indicator[Seq[CandleStick], _]] = Seq.empty) {
 
     def addCandleStick(candle: CandleStick): Option[CandleStick] = {
-      def add(candle: CandleStick): Option[CandleStick] = Option(candle.complete).collect { case true => // looks crappy, I know
-        candles = candle +: candles
-        indicators.foreach(_(candles))
-        candle
+      def add(candle: CandleStick): Option[CandleStick] = candle.complete.option {
+        val indicatorValues: Map[Indicator[Seq[CandleStick], _], Any] = (indicators, indicators.map(_(candle +: candles))).zipped.collect { case (indicator, Some(value)) => (indicator, value)}.toMap
+        val enrichedCandle = candle.copy(indicators = indicatorValues)
+        candles = enrichedCandle +: candles
+        enrichedCandle
       }
 
       candles match {

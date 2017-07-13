@@ -26,6 +26,7 @@ class Model$Test extends FunSpec with Matchers {
         .foreach(chart.addCandleStick)
 
       val actualValues = indicator._values
+      println(actualValues)
       actualValues should have size expected.size
       (actualValues, expected).zipped.foreach(checkNumbersMatch())
     }
