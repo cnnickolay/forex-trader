@@ -12,13 +12,10 @@ import scala.concurrent.duration.DurationLong
 import scalaz.Scalaz._
 
 object CandleStreamingActor {
-
   case object Tick
-
 }
 
 class CandleStreamingActor(next: ActorRef, chart: Chart) extends Actor {
-
   override def preStart() = {
     context.system.scheduler.schedule(0.seconds, 10.seconds, self, Tick)
   }

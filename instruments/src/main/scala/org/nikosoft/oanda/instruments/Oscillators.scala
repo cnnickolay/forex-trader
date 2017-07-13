@@ -45,13 +45,6 @@ object Oscillators {
     MACDItem(currentValue, ema12, ema26, macd, signalLine)
   }
 
-  def awesomeOscillator() = ???
-
-  def cmo() = ???
-}
-
-object CMO {
-
   def cmo(period: Int, values: Seq[BigDecimal]): Option[BigDecimal] = (values.size >= period).option {
     val slice = values.take(period)
     val diffs = slice.sliding(2).map { case (head +: prev +: Nil) => head - prev }.toList
@@ -65,5 +58,6 @@ object CMO {
     div
   }
 
+  def awesomeOscillator() = ???
 }
 

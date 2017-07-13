@@ -1,30 +1,31 @@
 package org.nikosoft.oanda.instruments
 
 import org.scalatest.{FunSpec, Matchers}
-import org.nikosoft.oanda.instruments.Oscillators.{MACDItem, macd, rsi}
+import org.nikosoft.oanda.instruments.Oscillators.{MACDItem, cmo, macd, rsi}
+
 import scalaz.Scalaz._
 
 class Oscillators$Test extends FunSpec with Matchers {
 
-  describe("CMO") {
+  describe("cmo") {
     it("should calculate cmo at the beginning") {
       val input: Seq[BigDecimal] = Seq(18235, 17980, 18310, 18605, 18980, 18915, 19475, 19050, 19065, 18850, 19025, 19005, 18505, 18635, 19245, 19305, 19125, 19525, 19775, 20385, 20515)
       val expected: BigDecimal = -40.7143
-      val actual = CMO.cmo(21, input)
+      val actual = cmo(21, input)
       actual.fold(fail("this should return something")) { _ shouldBe (expected +- 1e-4) }
     }
 
     it("should calculate cmo when there is more values than required by the period") {
       val input: Seq[BigDecimal] = Seq(17845, 18235, 17980, 18310, 18605, 18980, 18915, 19475, 19050, 19065, 18850, 19025, 19005, 18505, 18635, 19245, 19305, 19125, 19525, 19775, 20385, 20515)
       val expected: BigDecimal = -43.3447
-      val actual = CMO.cmo(21, input)
+      val actual = cmo(21, input)
       actual.fold(fail("this should return something")) { _ shouldBe (expected +- 1e-4) }
     }
 
     it("should return None if period is greater than amount of values") {
       val input: Seq[BigDecimal] = Seq(1, 2)
-      CMO.cmo(3, input) shouldBe None
-      CMO.cmo(2, input) shouldNot be(None)
+      cmo(3, input) shouldBe None
+      cmo(2, input) shouldNot be(None)
     }
   }
   
