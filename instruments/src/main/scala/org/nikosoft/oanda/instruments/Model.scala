@@ -46,15 +46,21 @@ object Model {
     override def toString(): String = this.getClass.getSimpleName
   }
 
-  class StochasticCandleIndicator(period: Int, smoothingPeriod: Option[Int], secondSmoothingPeriod: Option[Int]) extends Indicator[Seq[CandleStick], StochasticItem] {
+  class StochasticCandleIndicator(period: Int, smoothingPeriod: Option[Int], secondSmoothingPeriod: Option[Int]) extends Indicator[Seq[CandleStick], BigDecimal] {
     var stochastics = Seq.empty[StochasticItem]
-    protected def enrichFunction: Seq[CandleStick] => Option[StochasticItem] = { candles =>
+    protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = { candles =>
       val stochastic = Stochastic((period, smoothingPeriod, secondSmoothingPeriod, candles, stochastics))
       stochastics = stochastic.toSeq ++ stochastics
-      stochastic
+      stochastic.flatMap(value => {
+        (smoothingPeriod, secondSmoothingPeriod) match {
+          case (_, Some(_)) => value.smoothedAgain
+          case (Some(_), None) => value.smoothed
+          case (None, None) => Some(value.fastValue)
+        }
+      })
     }
 
-    override def toString(): String = super.toString() + (period +: smoothingPeriod.toSeq )
+    override def toString(): String = super.toString() + "_" + (Seq(period) ++ smoothingPeriod.toSeq ++ secondSmoothingPeriod.toSeq).mkString("_")
   }
   class CMOCandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => CMOIndicator((period, candles.map(_.close)))

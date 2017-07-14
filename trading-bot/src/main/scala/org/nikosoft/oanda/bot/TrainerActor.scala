@@ -33,12 +33,11 @@ class TrainerActor extends Actor {
         .map { case (first +: second +: _) => first.price - second.price }
         .toList
       println(s"Success rate ${((longResults.count(_ > 0).toDouble / longResults.size) * 100).toInt}%")
-/*
+
       candles.foreach(c => {
         println(c.close)
         c.indicators.foreach(i => println(s"  $i"))
       })
-*/
   }
 
 }

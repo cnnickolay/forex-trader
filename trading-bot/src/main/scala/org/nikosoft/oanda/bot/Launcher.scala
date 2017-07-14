@@ -16,7 +16,9 @@ object Launcher extends App {
       new MACDCandleCloseIndicator(),
       new RSICandleCloseIndicator(14),
       new EMACandleCloseIndicator(50),
-      new ATRCandleIndicator(14)
+      new ATRCandleIndicator(14),
+      new CMOCandleCloseIndicator(21),
+      new StochasticCandleIndicator(14, Some(3), Some(3))
     )
   )
   val managerActor = actorSystem.actorOf(Props.create(classOf[ManagerActor], chart), "manager-actor")

@@ -4,12 +4,10 @@ import org.apache.commons.lang3.RandomUtils
 import org.joda.time.Instant
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity.M5
 import org.nikosoft.oanda.instruments.Model._
-import org.nikosoft.oanda.instruments.Oscillators.StochasticItem
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.language.implicitConversions
 import scala.util.Random
-import scalaz.Scalaz._
 
 class Model$Test extends FunSpec with Matchers {
 
@@ -189,41 +187,34 @@ class Model$Test extends FunSpec with Matchers {
     implicit def highLowToCandle(highLow: (Double, Double)): CandleStick = CandleStick(Instant.now, 0, highLow._1, highLow._2, 0, 0, complete = true)
     implicit def highLowCloseToCandle(highLowClose: (Double, Double, Double)): CandleStick = CandleStick(Instant.now, 0, highLowClose._1, highLowClose._2, highLowClose._3, 0, complete = true)
 
-    it("should calculate Stochastic oscillator") {
-      val indicator = new StochasticCandleIndicator(14, Some(3), Some(3))
+    val prices = Seq[CandleStick](
+      (127.009, 125.3574),
+      (127.6159, 126.1633),
+      (126.5911, 124.9296),
+      (127.3472, 126.0937),
+      (128.173, 126.8199),
+      (128.4317, 126.4817),
+      (127.3671, 126.034),
+      (126.422, 124.8301),
+      (126.8995, 126.3921),
+      (126.8498, 125.7156),
+      (125.646, 124.5615),
+      (125.7156, 124.5715),
+      (127.1582, 125.0689),
+      (127.7154, 126.8597, 127.2876),
+      (127.6855, 126.6309, 127.1781),
+      (128.2228, 126.8001, 128.0138),
+      (128.2725, 126.7105, 127.1085),
+      (128.0934, 126.8001, 127.7253),
+      (128.2725, 126.1335, 127.0587),
+      (127.7353, 125.9245, 127.3273)
+    )
+
+    it("should calculate Stochastic oscillator only for fast value") {
+      val indicator = new StochasticCandleIndicator(14, None, None)
       val chart = aChart(indicators = Seq(indicator))
 
-      val prices = Seq[CandleStick](
-        (127.009, 125.3574),
-        (127.6159, 126.1633),
-        (126.5911, 124.9296),
-        (127.3472, 126.0937),
-        (128.173, 126.8199),
-        (128.4317, 126.4817),
-        (127.3671, 126.034),
-        (126.422, 124.8301),
-        (126.8995, 126.3921),
-        (126.8498, 125.7156),
-        (125.646, 124.5615),
-        (125.7156, 124.5715),
-        (127.1582, 125.0689),
-        (127.7154, 126.8597, 127.2876),
-        (127.6855, 126.6309, 127.1781),
-        (128.2228, 126.8001, 128.0138),
-        (128.2725, 126.7105, 127.1085),
-        (128.0934, 126.8001, 127.7253),
-        (128.2725, 126.1335, 127.0587),
-        (127.7353, 125.9245, 127.3273)
-      )
-      val expected = Seq[StochasticItem](
-        StochasticItem(74.52, Some(73.60), Some(74.40)),
-        StochasticItem(64.52, Some(70.69), Some(74.60)),
-        StochasticItem(81.74, Some(78.92), Some(76.29)),
-        StochasticItem(65.81, Some(74.20), None),
-        StochasticItem(89.20, Some(75.74), None),
-        StochasticItem(67.60, None, None),
-        StochasticItem(70.43, None, None)
-      )
+      val expected = Seq[BigDecimal](74.52, 64.52, 81.74, 65.81, 89.20, 67.60, 70.43)
 
       prices
         .zipWithIndex
@@ -232,10 +223,39 @@ class Model$Test extends FunSpec with Matchers {
 
       val actual = indicator._values
       actual should have size expected.size
-      (actual, expected).zipped.foreach((a, e) => {
-        checkNumbersMatch(1e-2)(~a.smoothed, ~e.smoothed)
-        checkNumbersMatch(1e-2)(~a.smoothedAgain, ~e.smoothedAgain)
-      })
+      (actual, expected).zipped.foreach(checkNumbersMatch(1e-2))
+    }
+
+    it("should calculate Stochastic oscillator only for smoothed value") {
+      val indicator = new StochasticCandleIndicator(14, Some(3), None)
+      val chart = aChart(indicators = Seq(indicator))
+
+      val expected = Seq[BigDecimal](73.60, 70.69, 78.92, 74.20, 75.74)
+
+      prices
+        .zipWithIndex
+        .map { case (price, idx) => price.copy(time = Instant.now().plus(idx * 1000)) }
+        .foreach(chart.addCandleStick)
+
+      val actual = indicator._values
+      actual should have size expected.size
+      (actual, expected).zipped.foreach(checkNumbersMatch(1e-2))
+    }
+
+    it("should calculate Stochastic oscillator only for smoothed again value :-D") {
+      val indicator = new StochasticCandleIndicator(14, Some(3), Some(3))
+      val chart = aChart(indicators = Seq(indicator))
+
+      val expected = Seq[BigDecimal](74.40, 74.60, 76.29)
+
+      prices
+        .zipWithIndex
+        .map { case (price, idx) => price.copy(time = Instant.now().plus(idx * 1000)) }
+        .foreach(chart.addCandleStick)
+
+      val actual = indicator._values
+      actual should have size expected.size
+      (actual, expected).zipped.foreach(checkNumbersMatch(1e-2))
     }
   }
 
