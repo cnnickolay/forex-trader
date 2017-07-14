@@ -86,5 +86,46 @@ class Oscillators$Test extends FunSpec with Matchers {
     }
 
   }
+  
+  describe("stochastic") {
+    implicit def highLowToCandle(highLow: (Double, Double)): CandleStick = CandleStick(Instant.now, 0, highLow._1, highLow._2, 0, 0, complete = true)
+    implicit def highLowCloseToCandle(highLowClose: (Double, Double, Double)): CandleStick = CandleStick(Instant.now, 0, highLowClose._1, highLowClose._2, highLowClose._3, 0, complete = true)
+
+    it("should return None if period is greater than amount of elements in values") {
+      val aCandle = (0.0, 0.0)
+      Stochastic.stochastic(2, None, None, Seq(aCandle)) shouldBe None
+    }
+
+    it("should calculate stochastic") {
+      val input = Seq[CandleStick](
+        (127.009, 125.3574),
+        (127.6159, 126.1633),
+        (126.5911, 124.9296),
+        (127.3472, 126.0937),
+        (128.173, 126.8199),
+        (128.4317, 126.4817),
+        (127.3671, 126.034),
+        (126.422, 124.8301),
+        (126.8995, 126.3921),
+        (126.8498, 125.7156),
+        (125.646, 124.5615),
+        (125.7156, 124.5715),
+        (127.1582, 125.0689),
+        (127.7154, 126.8597, 127.2876)
+      ).reverse
+      val expected: BigDecimal = 70.4382
+      val actual = Stochastic.stochastic(14, None, None, input)
+      actual.fold(fail("Value should not be None")) { actualValue =>
+        actualValue.fastValue shouldBe (expected +- 1e-4)
+      }
+
+      Stochastic.stochastic(14, None, None, ((127.6855, 126.6309, 127.1781): CandleStick) +: input)
+        .fold(fail("Value should not be None")) { actualValue =>
+          val expected: BigDecimal = 67.6089
+          actualValue.fastValue shouldBe (expected +- 1e-4)
+        }
+    }
+
+  }
 
 }
