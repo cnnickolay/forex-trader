@@ -4,7 +4,7 @@ import scalaz.Scalaz._
 
 object Smoothing {
 
-  def sma(period: Int, values: Seq[BigDecimal]): Option[BigDecimal] = (values.size < period).option(values.take(period).sum / period)
+  def sma(period: Int, values: Seq[BigDecimal]): Option[BigDecimal] = (values.size >= period).option(values.take(period).sum / period)
 
   def ema(period: Int, value: BigDecimal, lastEmaOption: Option[BigDecimal], values: Seq[BigDecimal] = Seq.empty): Option[BigDecimal] =
     (for {
