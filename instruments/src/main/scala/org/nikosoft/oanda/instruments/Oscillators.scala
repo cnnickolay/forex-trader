@@ -6,10 +6,10 @@ import scalaz.Scalaz._
 
 object Oscillators {
 
+  // some deuglyfication needed here
   def rsi(period: Int, avgGainLoss: Option[(BigDecimal, BigDecimal)], values: Seq[BigDecimal]): Option[(BigDecimal, BigDecimal, BigDecimal)] =
     avgGainLoss.fold {
-      if (values.size < period + 1) None
-      else {
+      (values.size > period).option {
         val diffs = values
           .take(period + 1)
           .reverse
@@ -22,7 +22,7 @@ object Oscillators {
 
         val rs = gain / loss
         val rsi: BigDecimal = 100 - (100.0 / (1.0 + rs))
-        (rsi, gain, loss).some
+        (rsi, gain, loss)
       }
     } { case (prevAvgGain, prevAvgLoss) =>
       val price +: prevPrice +: _ = values
