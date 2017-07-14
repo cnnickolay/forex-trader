@@ -58,6 +58,18 @@ object Oscillators {
     div
   }
 
+  case class Stochastic(fastValue: BigDecimal, smoothed: Option[BigDecimal] = None, smoothedAgain: Option[BigDecimal] = None)
+  def stochastic(period: Int,
+                 smoothingPeriod: Option[Int],
+                 secondSmoothingPeriod: Option[Int],
+                 values: Seq[CandleStick]): Option[Stochastic] = (values.size >= period).option {
+    val slice = values.take(period)
+    val highest = slice.foldLeft(values.head.high)((highest, c) => (c.high > highest) ? c.high | highest)
+    val lowest = slice.foldLeft(values.head.low)((lowest, c) => (c.low < lowest) ? c.low | lowest)
+    val close = slice.head.close
+    Stochastic((close - lowest)/(highest - lowest)*100)
+  }
+  
   def awesomeOscillator() = ???
 }
 
