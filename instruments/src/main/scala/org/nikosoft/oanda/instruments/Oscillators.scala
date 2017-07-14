@@ -64,12 +64,17 @@ object Oscillators {
                  smoothingPeriod: Option[Int],
                  secondSmoothingPeriod: Option[Int],
                  values: Seq[CandleStick],
-                 previousFastValues: Seq[BigDecimal] = Seq.empty): Option[StochasticItem] = (values.size >= period).option {
+                 previousStochastics: Seq[StochasticItem] = Seq.empty): Option[StochasticItem] = (values.size >= period).option {
     val slice = values.take(period)
     val highest = slice.foldLeft(values.head.high)((highest, c) => (c.high > highest) ? c.high | highest)
     val lowest = slice.foldLeft(values.head.low)((lowest, c) => (c.low < lowest) ? c.low | lowest)
     val close = slice.head.close
-    StochasticItem((close - lowest) / (highest - lowest) * 100)
+    val fastValue = (close - lowest) / (highest - lowest) * 100
+    val fastValues = fastValue +: previousStochastics.map(_.fastValue)
+    val smoothed = smoothingPeriod.collect { case (smoothing) if fastValues.size >= smoothing => Smoothing.sma(smoothing, fastValues) }.flatten
+    val smoothedValues = smoothed.toSeq ++ previousStochastics.flatMap(_.smoothed)
+    val smoothedAgain = secondSmoothingPeriod.collect { case (smoothing) if smoothedValues.size >= smoothing => Smoothing.sma(smoothing, smoothedValues) }.flatten
+    StochasticItem(fastValue, smoothed, smoothedAgain)
   }
   
   def awesomeOscillator() = ???
