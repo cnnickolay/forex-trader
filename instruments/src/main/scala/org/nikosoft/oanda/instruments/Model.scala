@@ -36,17 +36,22 @@ object Model {
       }
     }
     def _values = values
+
+    override def toString(): String = this.getClass.getSimpleName
   }
 
   class SMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => SMAIndicator((period, candles.map(_.close)))
+    override def toString(): String = super.toString() + s"_$period"
   }
   class ATRCandleIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: (Seq[CandleStick]) => Option[BigDecimal] = candles => ATRIndicator(period, candles, _values.headOption)
+    override def toString(): String = super.toString() + s"_$period"
   }
   class EMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: (Seq[CandleStick]) => Option[BigDecimal] =
       candles => candles.headOption.flatMap(candle => EMAIndicator((period, candle.close, _values.headOption, candles.take(period).map(_.close))))
+    override def toString(): String = super.toString() + s"_$period"
   }
   class RSICandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     var gainLoss: Option[(BigDecimal, BigDecimal)] = None
@@ -55,6 +60,7 @@ object Model {
         gainLoss = (gain, loss).some
         rsi
       }
+    override def toString(): String = super.toString() + s"_$period"
   }
   class MACDCandleCloseIndicator extends Indicator[Seq[CandleStick], MACDItem] {
     protected def enrichFunction: Seq[CandleStick] => Option[MACDItem] = candles => candles.headOption.flatMap(candle => MACDIndicator((candle.close, _values)))
@@ -67,7 +73,7 @@ object Model {
                          close: BigDecimal,
                          volume: Long,
                          complete: Boolean,
-                         indicators: Map[Indicator[Seq[CandleStick], _], Any] = Map.empty)
+                         indicators: Map[String, Any] = Map.empty)
 
   class Chart(val accountId: String,
               val instrument: String,
@@ -77,7 +83,7 @@ object Model {
 
     def addCandleStick(candle: CandleStick): Option[CandleStick] = {
       def add(candle: CandleStick): Option[CandleStick] = candle.complete.option {
-        val indicatorValues: Map[Indicator[Seq[CandleStick], _], Any] = (indicators, indicators.map(_(candle +: candles))).zipped.collect { case (indicator, Some(value)) => (indicator, value)}.toMap
+        val indicatorValues: Map[String, Any] = (indicators, indicators.map(_(candle +: candles))).zipped.collect { case (indicator, Some(value)) => (indicator.toString(), value)}.toMap
         val enrichedCandle = candle.copy(indicators = indicatorValues)
         candles = enrichedCandle +: candles
         enrichedCandle

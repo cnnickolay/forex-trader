@@ -1,5 +1,7 @@
 package org.nikosoft.oanda.instruments
 
+import org.nikosoft.oanda.instruments.Model.CandleStick
+
 import scalaz.Scalaz._
 
 object Oscillators {
@@ -33,16 +35,14 @@ object Oscillators {
       (rsi, avgGain, avgLoss).some
     }
 
-  case class MACDItem(price: BigDecimal, ema12: Option[BigDecimal] = None, ema26: Option[BigDecimal] = None, macd: Option[BigDecimal] = None, signalLine: Option[BigDecimal] = None) {
-    val histogram: Option[BigDecimal] = (macd |@| signalLine) (_ - _)
-  }
+  case class MACDItem(price: BigDecimal, ema12: Option[BigDecimal] = None, ema26: Option[BigDecimal] = None, macd: Option[BigDecimal] = None, signalLine: Option[BigDecimal] = None, histogram: Option[BigDecimal] = None)
 
   def macd(currentValue: BigDecimal, prevMacd: Seq[MACDItem] = Seq.empty): MACDItem = {
     val ema12 = Smoothing.ema(12, currentValue, prevMacd.headOption.flatMap(_.ema12), currentValue +: prevMacd.take(11).map(_.price))
     val ema26 = Smoothing.ema(26, currentValue, prevMacd.headOption.flatMap(_.ema26), currentValue +: prevMacd.take(25).map(_.price))
     val macd = (ema12 |@| ema26) (_ - _)
     val signalLine = macd.flatMap(macdValue => Smoothing.ema(9, macdValue, prevMacd.headOption.flatMap(_.signalLine), macdValue +: prevMacd.take(8).flatMap(_.macd)))
-    MACDItem(currentValue, ema12, ema26, macd, signalLine)
+    MACDItem(currentValue, ema12, ema26, macd, signalLine, (macd |@| signalLine) (_ - _))
   }
 
   def cmo(period: Int, values: Seq[BigDecimal]): Option[BigDecimal] = (values.size >= period).option {
@@ -58,16 +58,18 @@ object Oscillators {
     div
   }
 
-  case class Stochastic(fastValue: BigDecimal, smoothed: Option[BigDecimal] = None, smoothedAgain: Option[BigDecimal] = None)
+  case class StochasticItem(fastValue: BigDecimal, smoothed: Option[BigDecimal] = None, smoothedAgain: Option[BigDecimal] = None)
+
   def stochastic(period: Int,
                  smoothingPeriod: Option[Int],
                  secondSmoothingPeriod: Option[Int],
-                 values: Seq[CandleStick]): Option[Stochastic] = (values.size >= period).option {
+                 values: Seq[CandleStick],
+                 previousFastValues: Seq[BigDecimal] = Seq.empty): Option[StochasticItem] = (values.size >= period).option {
     val slice = values.take(period)
     val highest = slice.foldLeft(values.head.high)((highest, c) => (c.high > highest) ? c.high | highest)
     val lowest = slice.foldLeft(values.head.low)((lowest, c) => (c.low < lowest) ? c.low | lowest)
     val close = slice.head.close
-    Stochastic((close - lowest)/(highest - lowest)*100)
+    StochasticItem((close - lowest) / (highest - lowest) * 100)
   }
   
   def awesomeOscillator() = ???

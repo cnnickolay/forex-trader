@@ -1,8 +1,11 @@
 package org.nikosoft.oanda.instruments
 
+import org.joda.time.Instant
+import org.nikosoft.oanda.instruments.Model.CandleStick
 import org.scalatest.{FunSpec, Matchers}
-import org.nikosoft.oanda.instruments.Oscillators.{MACDItem, cmo, macd, rsi}
+import org.nikosoft.oanda.instruments.Oscillators._
 
+import scala.language.implicitConversions
 import scalaz.Scalaz._
 
 class Oscillators$Test extends FunSpec with Matchers {
@@ -93,7 +96,7 @@ class Oscillators$Test extends FunSpec with Matchers {
 
     it("should return None if period is greater than amount of elements in values") {
       val aCandle = (0.0, 0.0)
-      Stochastic.stochastic(2, None, None, Seq(aCandle)) shouldBe None
+      stochastic(2, None, None, Seq(aCandle)) shouldBe None
     }
 
     it("should calculate stochastic") {
@@ -114,18 +117,21 @@ class Oscillators$Test extends FunSpec with Matchers {
         (127.7154, 126.8597, 127.2876)
       ).reverse
       val expected: BigDecimal = 70.4382
-      val actual = Stochastic.stochastic(14, None, None, input)
+      val actual = stochastic(14, None, None, input)
       actual.fold(fail("Value should not be None")) { actualValue =>
         actualValue.fastValue shouldBe (expected +- 1e-4)
       }
 
-      Stochastic.stochastic(14, None, None, ((127.6855, 126.6309, 127.1781): CandleStick) +: input)
+      stochastic(14, None, None, ((127.6855, 126.6309, 127.1781): CandleStick) +: input)
         .fold(fail("Value should not be None")) { actualValue =>
           val expected: BigDecimal = 67.6089
           actualValue.fastValue shouldBe (expected +- 1e-4)
         }
     }
 
+    ignore("should smooth stochastic") {
+
+    }
   }
 
 }
