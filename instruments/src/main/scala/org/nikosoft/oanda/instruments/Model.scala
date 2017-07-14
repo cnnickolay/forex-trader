@@ -2,7 +2,7 @@ package org.nikosoft.oanda.instruments
 
 import org.joda.time.Instant
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity.CandlestickGranularity
-import org.nikosoft.oanda.instruments.Oscillators.MACDItem
+import org.nikosoft.oanda.instruments.Oscillators.{MACDItem, StochasticItem}
 
 import scalaz.Scalaz._
 
@@ -10,6 +10,12 @@ object Model {
 
   sealed trait IndicatorType[T, K] extends (T => Option[K])
 
+  case object Stochastic extends IndicatorType[(Int, Option[Int], Option[Int], Seq[CandleStick], Seq[StochasticItem]), StochasticItem] {
+    def apply(input: (Int, Option[Int], Option[Int], Seq[CandleStick], Seq[StochasticItem])): Option[StochasticItem] = (Oscillators.stochastic _).tupled(input)
+  }
+  case object CMOIndicator extends IndicatorType[(Int, Seq[BigDecimal]), BigDecimal] {
+    def apply(input: (Int, Seq[BigDecimal])): Option[BigDecimal] = (Oscillators.cmo _).tupled(input)
+  }
   case object ATRIndicator extends IndicatorType[(Int, Seq[CandleStick], Option[BigDecimal]), BigDecimal] {
     def apply(input: (Int, Seq[CandleStick], Option[BigDecimal])): Option[BigDecimal] = (Indicators.atr _).tupled(input)
   }
@@ -40,6 +46,20 @@ object Model {
     override def toString(): String = this.getClass.getSimpleName
   }
 
+  class StochasticCandleIndicator(period: Int, smoothingPeriod: Option[Int], secondSmoothingPeriod: Option[Int]) extends Indicator[Seq[CandleStick], StochasticItem] {
+    var stochastics = Seq.empty[StochasticItem]
+    protected def enrichFunction: Seq[CandleStick] => Option[StochasticItem] = { candles =>
+      val stochastic = Stochastic((period, smoothingPeriod, secondSmoothingPeriod, candles, stochastics))
+      stochastics = stochastic.toSeq ++ stochastics
+      stochastic
+    }
+
+    override def toString(): String = super.toString() + (period +: smoothingPeriod.toSeq )
+  }
+  class CMOCandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
+    protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => CMOIndicator((period, candles.map(_.close)))
+    override def toString(): String = super.toString() + s"_$period"
+  }
   class SMACandleCloseIndicator(period: Int) extends Indicator[Seq[CandleStick], BigDecimal] {
     protected def enrichFunction: Seq[CandleStick] => Option[BigDecimal] = candles => SMAIndicator((period, candles.map(_.close)))
     override def toString(): String = super.toString() + s"_$period"
