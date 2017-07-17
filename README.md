@@ -14,6 +14,7 @@ When I'm writing this readme there are only few indicators are implemented, thos
 * MACD - Moving Average Convergence Divergence
 * RSI - relative strength index
 * CMO - chande momentum oscillator
+* Stochastic oscillator
 
 Existing java libraries for calculating those indicators are extremely ugly, so I had no choice but to reinvent the wheel here.
 #### Trading strategies
