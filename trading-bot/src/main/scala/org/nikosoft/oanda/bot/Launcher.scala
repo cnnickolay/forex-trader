@@ -11,14 +11,15 @@ object Launcher extends App {
   val chart = new Chart(
     accountId = "001-004-1442547-003",
     instrument = "EUR_USD",
-    granularity = CandlestickGranularity.M5,
+    granularity = CandlestickGranularity.M1,
     indicators = Seq(
       new MACDCandleCloseIndicator(),
       new RSICandleCloseIndicator(14),
       new EMACandleCloseIndicator(50),
+      new EMACandleCloseIndicator(100),
       new ATRCandleIndicator(14),
       new CMOCandleCloseIndicator(21),
-      new StochasticCandleIndicator(14, Some(3), Some(3))
+      new StochasticCandleIndicator(5, Some(3), Some(3))
     )
   )
   val managerActor = actorSystem.actorOf(Props.create(classOf[ManagerActor], chart), "manager-actor")

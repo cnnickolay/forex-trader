@@ -99,7 +99,9 @@ object Model {
                          close: BigDecimal,
                          volume: Long,
                          complete: Boolean,
-                         indicators: Map[String, Any] = Map.empty)
+                         indicators: Map[String, Any] = Map.empty) {
+    def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: String)(implicit manifest: Manifest[T]): Option[OUTPUT] = indicators.get(manifest.runtimeClass.getSimpleName + s"_$conf").map(_.asInstanceOf[OUTPUT])
+  }
 
   class Chart(val accountId: String,
               val instrument: String,
