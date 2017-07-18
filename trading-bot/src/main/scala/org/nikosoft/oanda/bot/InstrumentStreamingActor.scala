@@ -18,7 +18,7 @@ class InstrumentStreamingActor(next: ActorRef, chart: Chart) extends Actor {
     case StartActor =>
       Future {
         val stream = Api.pricingApi.pricingStream(AccountID(chart.accountId), Seq(InstrumentName(chart.instrument)), snapshot = true, terminate = terminate)
-        Iterator.continually(stream.take()).foreach(_.foreach(context.actorSelection("../router") ! _))
+        Iterator.continually(stream.take()).foreach(_.foreach(next ! _))
       }
     case StopActor =>
       println("Shutting down")
