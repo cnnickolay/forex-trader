@@ -100,7 +100,8 @@ object Model {
                          volume: Long,
                          complete: Boolean,
                          indicators: Map[String, Any] = Map.empty) {
-    def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: String)(implicit manifest: Manifest[T]): Option[OUTPUT] = indicators.get(manifest.runtimeClass.getSimpleName + s"_$conf").map(_.asInstanceOf[OUTPUT])
+    def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: Option[String])(implicit manifest: Manifest[T]): Option[OUTPUT] = indicators.get(manifest.runtimeClass.getSimpleName + s"${conf.fold("")(s => "_" + s)}").map(_.asInstanceOf[OUTPUT])
+    def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: String)(implicit manifest: Manifest[T]): Option[OUTPUT] = indicator[T, OUTPUT](Some(conf))
   }
 
   class Chart(val accountId: String,

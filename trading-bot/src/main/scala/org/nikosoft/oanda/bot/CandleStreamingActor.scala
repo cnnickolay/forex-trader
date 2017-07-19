@@ -26,7 +26,7 @@ class CandleStreamingActor(next: ActorRef, chart: Chart) extends Actor {
         .candles(
           instrument = InstrumentName(chart.instrument),
           granularity = chart.granularity,
-          count = (chart._candles.isEmpty ? 100 | 2).some
+          count = (chart._candles.isEmpty ? 5000 | 2).some
         )
 
       candlesResponse.map(_.candles
