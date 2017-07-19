@@ -4,6 +4,7 @@ import akka.actor.Actor
 import org.nikosoft.oanda.api.ApiModel.PricingModel.Price
 import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, MACDCandleCloseIndicator, StochasticCandleIndicator}
 import org.nikosoft.oanda.instruments.Oscillators.MACDItem
+import scalaz.Scalaz._
 
 object MACDScalperActor {
 
@@ -27,22 +28,27 @@ class MACDScalperActor(chart: Chart) extends Actor {
 
   def receive: Receive = {
     case candles: Seq[CandleStick] =>
-      candles.reverse.foldLeft((Seq.empty[CandleStick], Option.empty[CandleStick], TrainingStatistics())) {
-        case ((historicalCandles, None), candle) =>
+      val (_, _, stats) = candles.reverse.foldLeft((Seq.empty[CandleStick], Option.empty[CandleStick], TrainingStatistics())) {
+        case ((historicalCandles, None, _stats), candle) =>
           val toppedUpHistoricalCandles = candle +: historicalCandles
           considerOpeningPosition(toppedUpHistoricalCandles) match {
             case Some(OpenLongPosition) =>
               val openedAt = Some(candle)
-              (toppedUpHistoricalCandles, openedAt)
-            case _ => (toppedUpHistoricalCandles, None)
+              (toppedUpHistoricalCandles, openedAt, _stats)
+            case _ => (toppedUpHistoricalCandles, None, _stats)
           }
-        case ((historicalCandles, openedAtOption @ Some(openedAt)), candle) =>
+        case ((historicalCandles, openedAtOption@Some(openedAt), _stats), candle) =>
           val toppedUpHistoricalCandles = candle +: historicalCandles
           if (considerClosingPosition(toppedUpHistoricalCandles)) {
+            val trade = ((candle.close - openedAt.close) * 100000).toInt
             println(s"opened position at ${openedAt.time}, closed at ${candle.time}, ${candle.close - openedAt.close}")
-            (toppedUpHistoricalCandles, None)
-          } else (toppedUpHistoricalCandles, openedAtOption)
+            val profitPips = (trade > 0) ? (_stats.profitPips + trade) | _stats.profitPips
+            val lossPips = (trade < 0) ? (_stats.lossPips + (-trade)) | _stats.lossPips
+            (toppedUpHistoricalCandles, None, _stats.copy(profitPips = profitPips, lossPips))
+          } else (toppedUpHistoricalCandles, openedAtOption, _stats)
       }
+
+      println(s"Profit ${stats.profitPips}, loss ${stats.lossPips}, diff ${stats.profitPips - stats.lossPips}")
 
     case candle: CandleStick =>
 
@@ -59,7 +65,11 @@ class MACDScalperActor(chart: Chart) extends Actor {
     prevMacdHistogram <- prevMacd.histogram
     stochastic <- candle.indicator[StochasticCandleIndicator, BigDecimal]("5_3_3")
   } yield {
-    if (prevMacdHistogram < 0 && macdHistogram > 0) OpenLongPosition
+    if (
+      macdHistogram < 0 &&
+//      macdHistogram > prevMacdHistogram &&
+      stochastic < 10
+    ) OpenLongPosition
     else DoNothing
   }
 
@@ -70,8 +80,13 @@ class MACDScalperActor(chart: Chart) extends Actor {
     macdHistogram <- macd.histogram
     prevMacd <- previousCandle.indicator[MACDCandleCloseIndicator, MACDItem](None)
     prevMacdHistogram <- prevMacd.histogram
+    stochastic <- candle.indicator[StochasticCandleIndicator, BigDecimal]("5_3_3")
   } yield {
-    if (macdHistogram < 0 && prevMacdHistogram > 0) true
+//    if (macdHistogram > 0 && prevMacdHistogram < 0) true
+    if (
+      macdHistogram > 0 &&
+      stochastic > 90
+    ) true
     else false
   }).getOrElse(false)
 }
