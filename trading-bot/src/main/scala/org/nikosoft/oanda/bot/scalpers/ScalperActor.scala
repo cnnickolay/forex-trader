@@ -20,10 +20,10 @@ class ScalperActor(chart: Chart) extends Actor {
 
   var allCandles: Seq[CandleStick] = Seq.empty
   var currentSpread: Int = _
-  var position: Option[Position] = None
-
-  val minAtr = 15
   val maxSpread = 15
+
+  var position: Option[Position] = None
+  val minAtr = 15
   val tradingUnits = 100
 
   override def preStart(): Unit = {

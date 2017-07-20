@@ -3,16 +3,19 @@ package org.nikosoft.oanda.bot.scalpers
 import akka.actor.Actor
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
-import org.nikosoft.oanda.api.ApiModel.OrderModel.{TimeInForce, MarketOrderRequest}
+import org.nikosoft.oanda.api.ApiModel.OrderModel.{MarketOrderRequest, TimeInForce}
 import org.nikosoft.oanda.api.ApiModel.PositionModel.Position
-import org.nikosoft.oanda.api.ApiModel.PricingModel.{PriceValue, Price}
+import org.nikosoft.oanda.api.ApiModel.PricingModel.{Price, PriceValue}
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
-import org.nikosoft.oanda.api.ApiModel.TransactionModel.{StopLossDetails, TakeProfitDetails}
+import org.nikosoft.oanda.api.ApiModel.TransactionModel.StopLossDetails
 import org.nikosoft.oanda.api.`def`.OrderApi.CreateOrderRequest
 import org.nikosoft.oanda.api.`def`.PositionApi.ClosePositionRequest
-import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, MACDCandleCloseIndicator, StochasticCandleIndicator}
+import org.nikosoft.oanda.instruments.Model._
 import org.nikosoft.oanda.instruments.Oscillators.MACDItem
+
+import scala.math.BigDecimal.RoundingMode._
 import scalaz.Scalaz._
+import scalaz.\/-
 
 object MACDScalperActor {
   trait OpenPosition
@@ -29,6 +32,9 @@ class MACDScalperActor(chart: Chart) extends Actor {
   var allCandles: Seq[CandleStick] = Seq.empty
   var positionOption: Option[Position] = None
   val tradingUnits = 100
+  var currentSpread: Int = _
+  val maxSpread = 15
+
 
   override def preStart(): Unit = {
     updatePosition()
@@ -67,17 +73,22 @@ class MACDScalperActor(chart: Chart) extends Actor {
       allCandles = candle +: allCandles
 
       positionOption.fold {
-        considerOpeningPosition(allCandles) match {
-          case Some(OpenLongPosition) => println("Opening long position"); openLongPosition(tradingUnits)
-          case Some(OpenShortPosition) => println("Opening short position"); openShortPosition(tradingUnits)
-          case _ =>
-        }
+        if (currentSpread <= maxSpread)
+          (considerOpeningPosition(allCandles), candle.indicator[ATRCandleIndicator, BigDecimal]("14").map(_.rnd)) match {
+            case (Some(OpenLongPosition), Some(atr)) => println("Opening long position"); openLongPosition(tradingUnits, atr)
+            case (Some(OpenShortPosition), Some(atr)) => println("Opening short position"); openShortPosition(tradingUnits, atr)
+            case _ =>
+          }
       } (_ => if (considerClosingPosition(allCandles)) {
         println("Closing position")
         closePositions()
       })
 
     case price: Price =>
+      (price.asks.headOption.map(_.price.value) |@| price.bids.headOption.map(_.price.value)) (_ - _) match {
+        case Some(spread) => currentSpread = (spread * 100000).toInt
+        case None =>
+      }
 
   }
 
@@ -85,8 +96,12 @@ class MACDScalperActor(chart: Chart) extends Actor {
     candle <- lastCandles.headOption
     previousCandle <- lastCandles.tail.headOption
     macd <- candle.indicator[MACDCandleCloseIndicator, MACDItem](None)
+    macdValue <- macd.macd
+    macdSignal <- macd.signalLine
     macdHistogram <- macd.histogram
     prevMacd <- previousCandle.indicator[MACDCandleCloseIndicator, MACDItem](None)
+    prevMacdValue <- prevMacd.macd
+    prevMacdSignal <- prevMacd.signalLine
     prevMacdHistogram <- prevMacd.histogram
     stochastic <- candle.indicator[StochasticCandleIndicator, BigDecimal]("5_3_3")
     prevStochastic <- previousCandle.indicator[StochasticCandleIndicator, BigDecimal]("5_3_3")
@@ -114,20 +129,30 @@ class MACDScalperActor(chart: Chart) extends Actor {
 
   def updatePosition() = positionOption = Api.positionApi.openPositions(AccountID(chart.accountId)).toOption.flatMap(_.positions.headOption)
 
-  def openLongPosition(units: Int): Unit = {
+  def openLongPosition(units: Int, atr: BigDecimal): Unit = {
+    val price = getPrice
+
     Api.orderApi.createOrder(AccountID(chart.accountId), CreateOrderRequest(MarketOrderRequest(
       instrument = InstrumentName(chart.instrument),
       units = units,
-      timeInForce = TimeInForce.FOK
+      timeInForce = TimeInForce.FOK,
+      stopLossOnFill = Option(
+        StopLossDetails(price = PriceValue((price - atr * 2).rnd), timeInForce = TimeInForce.GTC)
+      )
     )))
     updatePosition()
   }
 
-  def openShortPosition(units: Int): Unit = {
+  def openShortPosition(units: Int, atr: BigDecimal): Unit = {
+    val price = getPrice
+
     Api.orderApi.createOrder(AccountID(chart.accountId), CreateOrderRequest(MarketOrderRequest(
       instrument = InstrumentName(chart.instrument),
       units = -units,
-      timeInForce = TimeInForce.FOK
+      timeInForce = TimeInForce.FOK,
+      stopLossOnFill = Option(
+        StopLossDetails(price = PriceValue((price + atr * 2).rnd), timeInForce = TimeInForce.GTC)
+      )
     )))
     updatePosition()
   }
@@ -136,4 +161,14 @@ class MACDScalperActor(chart: Chart) extends Actor {
     Api.positionApi.closePosition(AccountID(chart.accountId), InstrumentName(chart.instrument), ClosePositionRequest(longUnits = Some("ALL"), shortUnits = Some("ALL")))
     updatePosition()
   }
+
+  def getPrice: BigDecimal = {
+    val \/-(pricing) = Api.pricingApi.pricing(AccountID(chart.accountId), Seq(InstrumentName(chart.instrument)))
+    pricing.prices.head.asks.head.price.value
+  }
+
+  implicit class BigDecimalPimp(value: BigDecimal) {
+    def rnd: BigDecimal = value.setScale(5, HALF_DOWN)
+  }
+
 }
