@@ -1,6 +1,8 @@
 package org.nikosoft.oanda.api.impl
 
+import org.apache.http.client.HttpResponseException
 import org.apache.http.client.fluent.Request
+import org.apache.http.util.EntityUtils
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity._
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.WeeklyAlignment._
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.{DateTime, InstrumentName}
@@ -9,6 +11,7 @@ import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
 import org.nikosoft.oanda.api.ApiCommons
 import org.nikosoft.oanda.api.`def`.InstrumentApi
 
+import scala.util.Try
 import scalaz.\/
 
 /**
@@ -56,12 +59,15 @@ private[api] object InstrumentApiImpl extends InstrumentApi with ApiCommons {
     ).flatten.mkString("&")
 
     val url = s"$baseUrl/instruments/${instrument.value}/candles?$params"
-    val content = Request
+    val response = Request
       .Get(url)
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
+
+    val content = EntityUtils.toString(response.getEntity)
+
+    println(content)
 
     handleRequest[CandlesResponse](content)
   }

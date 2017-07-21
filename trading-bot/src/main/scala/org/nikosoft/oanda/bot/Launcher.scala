@@ -2,7 +2,7 @@ package org.nikosoft.oanda.bot
 
 import akka.actor.{ActorSystem, Props}
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity
-import org.nikosoft.oanda.instruments.Model._
+import org.nikosoft.oanda.instruments.Model.{StochasticCandleIndicator, _}
 
 object Launcher extends App {
 
@@ -19,9 +19,19 @@ object Launcher extends App {
       new EMACandleCloseIndicator(100),
       new ATRCandleIndicator(14),
       new CMOCandleCloseIndicator(21),
+      new StochasticCandleIndicator(5, Some(3), None),
+      new StochasticCandleIndicator(5, Some(3), Some(1)),
+      new StochasticCandleIndicator(5, Some(3), Some(2)),
       new StochasticCandleIndicator(5, Some(3), Some(3)),
-      new StochasticCandleIndicator(5, Some(3), None)
+      new StochasticCandleIndicator(5, Some(3), Some(4)),
+      new StochasticCandleIndicator(5, Some(3), Some(5))
     )
+     /*++ (for {
+      range <- 3 to 7
+      smoothing <- 3 to 4
+      secondSmoothing <- 3 to 4
+    } yield new StochasticCandleIndicator(range, Some(smoothing), Some(secondSmoothing)))*/
   )
+
   val managerActor = actorSystem.actorOf(Props.create(classOf[ManagerActor], chart), "manager-actor")
 }

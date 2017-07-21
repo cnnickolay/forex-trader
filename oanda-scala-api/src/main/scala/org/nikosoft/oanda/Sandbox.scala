@@ -6,6 +6,7 @@ import org.nikosoft.oanda.api.ApiModel.InstrumentModel.{Candlestick, Candlestick
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.{DateTime, InstrumentName}
 import org.nikosoft.oanda.api.ApiModel.TransactionModel.{TransactionFilter, TransactionID}
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
+import org.nikosoft.oanda.api.`def`.PositionApi.ClosePositionRequest
 import org.nikosoft.oanda.api.impl.{AccountsApiImpl, InstrumentApiImpl, TransactionApiImpl}
 
 import scala.concurrent.duration.DurationInt
@@ -73,4 +74,6 @@ object Sandbox extends App {
       from = Some(DateTime("2017-07-01T00:00:00Z")),
       to = Some(DateTime("2017-07-03T00:00:00Z"))
     )
+
+//  Api.positionApi.closePosition(AccountID("001-004-1442547-003"), InstrumentName("EUR_USD"), ClosePositionRequest(shortUnits = Some("ALL")))
 }
