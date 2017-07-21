@@ -3,7 +3,7 @@ package org.nikosoft.oanda.bot
 import akka.actor.{Actor, ActorRef}
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.{Candlestick, CandlestickData}
-import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
+import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.{DateTime, InstrumentName}
 import org.nikosoft.oanda.bot.CandleStreamingActor.Tick
 import org.nikosoft.oanda.instruments.Model._
 
@@ -27,6 +27,9 @@ class CandleStreamingActor(next: ActorRef, chart: Chart) extends Actor {
           instrument = InstrumentName(chart.instrument),
           granularity = chart.granularity,
           count = (chart._candles.isEmpty ? 5000 | 2).some
+//          count = None,
+//          from = Some(DateTime("2017-07-17T00:00:00Z")),
+//          to = Some(DateTime("2017-07-20T00:00:00Z"))
         )
 
       candlesResponse.map(_.candles

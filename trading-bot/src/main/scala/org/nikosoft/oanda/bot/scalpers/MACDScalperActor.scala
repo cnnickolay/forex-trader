@@ -18,11 +18,18 @@ import scalaz.Scalaz._
 import scalaz.\/-
 
 object MACDScalperActor {
+
   trait OpenPosition
+
   case object OpenShortPosition extends OpenPosition
+
   case object OpenLongPosition extends OpenPosition
+
   case object DoNothing extends OpenPosition
-  case class TrainingStatistics(profitPips: Int = 0, lossPips: Int = 0, openedLong: Option[CandleStick] = None, openedShort: Option[CandleStick] = None)
+
+  case class TrainingTrade(long: Boolean, entry: CandleStick, exit: CandleStick)
+  case class TrainingStatistics(profitPips: Int = 0, lossPips: Int = 0, openedLong: Option[CandleStick] = None, openedShort: Option[CandleStick] = None, trades: Seq[TrainingTrade] = Seq.empty)
+
 }
 
 class MACDScalperActor(chart: Chart) extends Actor {
@@ -43,7 +50,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
   def receive: Receive = {
     case candles: Seq[CandleStick] =>
       val (_, stats) = candles.reverse.foldLeft((Seq.empty[CandleStick], TrainingStatistics())) {
-        case ((historicalCandles, _stats @ TrainingStatistics(_, _, None, None)), candle) =>
+        case ((historicalCandles, _stats@TrainingStatistics(_, _, None, None, _)), candle) =>
           val toppedUpHistoricalCandles = candle +: historicalCandles
           considerOpeningPosition(toppedUpHistoricalCandles) match {
             case Some(OpenLongPosition) => (toppedUpHistoricalCandles, _stats.copy(openedLong = Some(candle)))
@@ -51,7 +58,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
             case _ => (toppedUpHistoricalCandles, _stats)
           }
 
-        case ((historicalCandles, _stats @ TrainingStatistics(_, _, longPosition, shortPosition)), candle) =>
+        case ((historicalCandles, _stats@TrainingStatistics(_, _, longPosition, shortPosition, _)), candle) =>
           val toppedUpHistoricalCandles = candle +: historicalCandles
           val gainLoss = (longPosition, shortPosition) match {
             case (Some(_openedAt), None) => candle.close - _openedAt.close
@@ -84,7 +91,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
             case (Some(OpenShortPosition)) => println("Opening short position"); openShortPosition(tradingUnits)
             case _ =>
           }
-      } (_ => if (considerClosingPosition(allCandles)) {
+      }(_ => if (considerClosingPosition(allCandles)) {
         println("Closing position")
         closePositions()
       })
@@ -140,7 +147,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
       instrument = InstrumentName(chart.instrument),
       units = units,
       timeInForce = TimeInForce.FOK
-    ))).fold(error => println(error),order => updatePosition())
+    ))).fold(error => println(error), order => updatePosition())
   }
 
   def openShortPosition(units: Int): Unit = {
@@ -148,12 +155,15 @@ class MACDScalperActor(chart: Chart) extends Actor {
       instrument = InstrumentName(chart.instrument),
       units = -units,
       timeInForce = TimeInForce.FOK
-    ))).fold(error => println(error),order => updatePosition())
+    ))).fold(error => println(error), order => updatePosition())
   }
 
-  def closePositions(): Unit = {
-    Api.positionApi.closePosition(AccountID(chart.accountId), InstrumentName(chart.instrument), ClosePositionRequest(longUnits = Some("ALL"), shortUnits = Some("ALL")))
-    updatePosition()
+  def closePositions(): Unit = positionOption match {
+    case Some(position) =>
+      val closePositionRequest = if (isLongPosition(position)) ClosePositionRequest(longUnits = Some("ALL")) else ClosePositionRequest(shortUnits = Some("ALL"))
+      Api.positionApi.closePosition(AccountID(chart.accountId), InstrumentName(chart.instrument), closePositionRequest)
+        .fold(error => println(error), _ => updatePosition())
+    case _ => println("No open positions to close")
   }
 
   def getPrice: BigDecimal = {
@@ -164,5 +174,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
   implicit class BigDecimalPimp(value: BigDecimal) {
     def rnd: BigDecimal = value.setScale(5, HALF_DOWN)
   }
+
+  private def isLongPosition(position: Position) = position.long.tradeIDs.nonEmpty
 
 }

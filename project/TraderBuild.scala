@@ -9,6 +9,7 @@ object TraderBuild extends Build {
 
   lazy val root = Project(id = "oanda-trader", base = file("."))
     .aggregate(api, instrument, tradingBot)
+    .dependsOn(tradingBot)
   lazy val api = Project(id = "oanda-scala-api", base = file("oanda-scala-api"))
     .settings(libraryDependencies ++= commonDependencies)
   lazy val instrument = Project(id = "instruments", base = file("instruments"))

@@ -3,7 +3,7 @@ package org.nikosoft.oanda
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.{Candlestick, CandlestickGranularity}
-import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
+import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.{DateTime, InstrumentName}
 import org.nikosoft.oanda.api.ApiModel.TransactionModel.{TransactionFilter, TransactionID}
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
 import org.nikosoft.oanda.api.impl.{AccountsApiImpl, InstrumentApiImpl, TransactionApiImpl}
@@ -59,6 +59,18 @@ object Sandbox extends App {
   }
 */
 
+/*
   val \/-(candles: CandlesResponse) = Api.instrumentsApi.candles(InstrumentName("EUR_USD"), granularity = CandlestickGranularity.M5, count = Option(100))
   candles.candles.flatMap(_.mid).map(candle => candle.h.pips - candle.l.pips).foreach(println)
+*/
+
+
+  Api.instrumentsApi
+    .candles(
+      instrument = InstrumentName("EUR_USD"),
+      granularity = CandlestickGranularity.H1,
+      count = None,
+      from = Some(DateTime("2017-07-01T00:00:00Z")),
+      to = Some(DateTime("2017-07-03T00:00:00Z"))
+    )
 }

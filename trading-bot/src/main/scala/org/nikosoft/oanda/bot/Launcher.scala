@@ -24,5 +24,4 @@ object Launcher extends App {
     )
   )
   val managerActor = actorSystem.actorOf(Props.create(classOf[ManagerActor], chart), "manager-actor")
-
 }

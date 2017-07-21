@@ -27,8 +27,6 @@ private[api] object OrderApiImpl extends OrderApi with ApiCommons {
   def createOrder(accountId: AccountID, order: CreateOrderRequest): \/[Error, CreateOrderResponse] = {
     val jsonBody = write(order)
 
-    println(jsonBody)
-
     val url = s"$baseUrl/accounts/${accountId.value}/orders"
     val content = Request
       .Post(url)
