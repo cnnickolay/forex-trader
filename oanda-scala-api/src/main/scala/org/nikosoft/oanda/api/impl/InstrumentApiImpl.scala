@@ -42,9 +42,9 @@ private[api] object InstrumentApiImpl extends InstrumentApi with ApiCommons {
               to: Option[DateTime],
               smooth: Boolean,
               includeFirst: Boolean,
-              dailyAlignment: Int,
-              alignmentTimezone: String,
-              weeklyAlignment: WeeklyAlignment): \/[Error, CandlesResponse] = handleRequest[CandlesResponse] {
+              dailyAlignment: Option[Int],
+              alignmentTimezone: Option[String],
+              weeklyAlignment: Option[WeeklyAlignment]): \/[Error, CandlesResponse] = handleRequest[CandlesResponse] {
 
     val params = Seq(
       Option(s"price=$price"),
@@ -54,9 +54,9 @@ private[api] object InstrumentApiImpl extends InstrumentApi with ApiCommons {
       to.map(s"to=" + _.value),
       Option(s"smooth=${if (smooth) "True" else "False"}"),
       Option(s"includeFirst=${if (includeFirst) "True" else "False"}"),
-      Option(s"dailyAlignment=$dailyAlignment"),
-      Option(s"alignmentTimezone=$alignmentTimezone"),
-      Option(s"weeklyAlignment=$weeklyAlignment")
+      dailyAlignment.map(s"dailyAlignment=" + _),
+      alignmentTimezone.map(s"alignmentTimezone=" + _),
+      weeklyAlignment.map(s"weeklyAlignment=" + _)
     ).flatten.mkString("&")
 
     val url = s"$baseUrl/instruments/${instrument.value}/candles?$params"

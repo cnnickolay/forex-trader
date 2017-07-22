@@ -51,9 +51,9 @@ trait InstrumentApi {
               to: Option[DateTime] = None,
               smooth: Boolean = false,
               includeFirst: Boolean = true,
-              dailyAlignment: Int = 17,
-              alignmentTimezone: String = "America/New_York",
-              weeklyAlignment: WeeklyAlignment = Friday
+              dailyAlignment: Option[Int] = None,
+              alignmentTimezone: Option[String] = None,
+              weeklyAlignment: Option[WeeklyAlignment] = None
              ): \/[Error, CandlesResponse]
 
 }

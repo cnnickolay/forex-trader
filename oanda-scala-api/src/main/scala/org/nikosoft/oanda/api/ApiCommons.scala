@@ -29,7 +29,7 @@ trait ApiCommons {
 
   protected val token = s"Bearer ${props.getProperty("token")}"
 
-  protected def handleRequest[T](response: => HttpResponse)(implicit m: Manifest[T]): \/[Error, T] = {
+  protected def handleRequest[T](response: HttpResponse)(implicit m: Manifest[T]): \/[Error, T] = {
     val content = EntityUtils.toString(response.getEntity)
 
     response.getStatusLine.getStatusCode match {
