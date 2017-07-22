@@ -44,8 +44,7 @@ private[api] object TradeApiImpl extends TradeApi with ApiCommons {
       .Get(url)
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[TradesResponse](content)
   }

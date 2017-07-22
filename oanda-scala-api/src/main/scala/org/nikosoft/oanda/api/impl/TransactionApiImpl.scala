@@ -44,8 +44,7 @@ private[api] object TransactionApiImpl extends TransactionApi with ApiCommons {
       .Get(url)
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[TransactionsResponse](content)
   }
@@ -71,8 +70,7 @@ private[api] object TransactionApiImpl extends TransactionApi with ApiCommons {
       .Get(url)
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[TransactionsIdRangeResponse](content)
   }

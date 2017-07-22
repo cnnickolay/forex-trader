@@ -2,10 +2,10 @@ package org.nikosoft.oanda.api
 
 import java.util.Properties
 
-import org.apache.http.NoHttpResponseException
-import org.json4s.MappingException
+import org.apache.http.HttpResponse
+import org.apache.http.util.EntityUtils
 import org.json4s.native.Serialization._
-import org.nikosoft.oanda.api.Errors.{ApiErrorResponse, Error, InternalError}
+import org.nikosoft.oanda.api.Errors.{ApiErrorResponse, Error}
 
 import scala.util.{Failure, Success, Try}
 import scalaz.Scalaz._
@@ -29,10 +29,17 @@ trait ApiCommons {
 
   protected val token = s"Bearer ${props.getProperty("token")}"
 
+  protected def handleRequest[T](response: => HttpResponse)(implicit m: Manifest[T]): \/[Error, T] = {
+    val content = EntityUtils.toString(response.getEntity)
+
+    response.getStatusLine.getStatusCode match {
+      case 200 => read[T](content).right
+      case code => read[ApiErrorResponse](content).copy(code = code).left
+    }
+  }
+
   protected def handleRequest[T](content: String)(implicit m: Manifest[T]): \/[Error, T] = Try(read[T](content)) match {
     case Success(accountResponse) => accountResponse.right
-    case Failure(t: MappingException) => t.printStackTrace(); InternalError(t.getMessage).left
-    case Failure(t: NoHttpResponseException) => t.printStackTrace(); InternalError(t.getMessage).left
     case Failure(_) => read[ApiErrorResponse](content).left
   }
 

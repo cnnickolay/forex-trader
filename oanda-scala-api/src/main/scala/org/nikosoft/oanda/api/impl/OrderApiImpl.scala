@@ -33,8 +33,7 @@ private[api] object OrderApiImpl extends OrderApi with ApiCommons {
       .addHeader("Authorization", token)
       .bodyString(jsonBody, ContentType.APPLICATION_JSON)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[CreateOrderResponse](content)
   }
@@ -64,8 +63,7 @@ private[api] object OrderApiImpl extends OrderApi with ApiCommons {
       .Get(url)
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[OrdersResponse](content)
   }
@@ -83,8 +81,7 @@ private[api] object OrderApiImpl extends OrderApi with ApiCommons {
       .Put(url)
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[CancelOrderResponse](content)
   }

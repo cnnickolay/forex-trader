@@ -25,8 +25,7 @@ private[api] object AccountsApiImpl extends AccountsApi with ApiCommons {
       .Get(s"$baseUrl/accounts")
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[AccountsResponse](content)
   }
@@ -42,8 +41,7 @@ private[api] object AccountsApiImpl extends AccountsApi with ApiCommons {
       .Get(s"$baseUrl/accounts/${accountId.value}")
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[AccountsDetailsResponse](content)
   }
@@ -59,8 +57,7 @@ private[api] object AccountsApiImpl extends AccountsApi with ApiCommons {
       .Get(s"$baseUrl/accounts/${accountId.value}/summary")
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[AccountSummaryResponse](content)
   }
@@ -77,8 +74,7 @@ private[api] object AccountsApiImpl extends AccountsApi with ApiCommons {
       .Get(s"$baseUrl/accounts/${accountId.value}/instruments?instruments=${instruments.map(_.value).mkString(",")}")
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[AccountInstrumentsResponse](content)
   }

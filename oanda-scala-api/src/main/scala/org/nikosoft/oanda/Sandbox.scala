@@ -73,7 +73,7 @@ object Sandbox extends App {
       count = None,
       from = Some(DateTime("2017-07-01T00:00:00Z")),
       to = Some(DateTime("2017-07-03T00:00:00Z"))
-    )
+    ).fold(println, println)
 
 //  Api.positionApi.closePosition(AccountID("001-004-1442547-003"), InstrumentName("EUR_USD"), ClosePositionRequest(shortUnits = Some("ALL")))
 }

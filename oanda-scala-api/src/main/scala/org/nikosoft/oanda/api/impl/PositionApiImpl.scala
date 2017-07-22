@@ -24,8 +24,7 @@ private[api] object PositionApiImpl extends PositionApi with ApiCommons {
       .Get(s"$baseUrl/accounts/${accountId.value}/positions")
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[PositionsResponse](content)
   }
@@ -41,8 +40,7 @@ private[api] object PositionApiImpl extends PositionApi with ApiCommons {
       .Get(s"$baseUrl/accounts/${accountId.value}/openPositions")
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[PositionsResponse](content)
   }
@@ -63,8 +61,7 @@ private[api] object PositionApiImpl extends PositionApi with ApiCommons {
       .addHeader("Authorization", token)
       .bodyString(jsonBody, ContentType.APPLICATION_JSON)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[ClosePositionResponse](content)
   }

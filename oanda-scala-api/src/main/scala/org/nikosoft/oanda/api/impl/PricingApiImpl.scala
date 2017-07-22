@@ -39,8 +39,7 @@ private[api] object PricingApiImpl extends PricingApi with ApiCommons {
       .Get(url)
       .addHeader("Authorization", token)
       .execute()
-      .returnContent()
-      .toString
+      .returnResponse()
 
     handleRequest[PricingResponse](content)
   }

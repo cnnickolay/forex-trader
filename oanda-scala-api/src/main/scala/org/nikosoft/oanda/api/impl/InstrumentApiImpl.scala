@@ -1,12 +1,13 @@
 package org.nikosoft.oanda.api.impl
 
+import org.apache.http.HttpResponse
 import org.apache.http.client.HttpResponseException
 import org.apache.http.client.fluent.Request
 import org.apache.http.util.EntityUtils
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity._
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.WeeklyAlignment._
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.{DateTime, InstrumentName}
-import org.nikosoft.oanda.api.Errors.Error
+import org.nikosoft.oanda.api.Errors.{ApiErrorResponse, Error}
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
 import org.nikosoft.oanda.api.ApiCommons
 import org.nikosoft.oanda.api.`def`.InstrumentApi
@@ -43,7 +44,7 @@ private[api] object InstrumentApiImpl extends InstrumentApi with ApiCommons {
               includeFirst: Boolean,
               dailyAlignment: Int,
               alignmentTimezone: String,
-              weeklyAlignment: WeeklyAlignment): \/[Error, CandlesResponse] = {
+              weeklyAlignment: WeeklyAlignment): \/[Error, CandlesResponse] = handleRequest[CandlesResponse] {
 
     val params = Seq(
       Option(s"price=$price"),
@@ -59,16 +60,11 @@ private[api] object InstrumentApiImpl extends InstrumentApi with ApiCommons {
     ).flatten.mkString("&")
 
     val url = s"$baseUrl/instruments/${instrument.value}/candles?$params"
-    val response = Request
+    Request
       .Get(url)
       .addHeader("Authorization", token)
       .execute()
       .returnResponse()
-
-    val content = EntityUtils.toString(response.getEntity)
-
-    println(content)
-
-    handleRequest[CandlesResponse](content)
   }
+
 }
