@@ -69,10 +69,10 @@ object Sandbox extends App {
   Api.instrumentsApi
     .candles(
       instrument = InstrumentName("EUR_USD"),
-      granularity = CandlestickGranularity.H1,
-      count = None,
-      from = Some(DateTime("2017-07-01T00:00:00Z")),
-      to = Some(DateTime("2017-07-03T00:00:00Z"))
+      granularity = CandlestickGranularity.M1,
+      count = Some(500)
+//      from = Some(DateTime("2017-07-04T00:00:00Z")),
+//      to = Some(DateTime("2017-07-05T00:00:00Z"))
     ).fold(println, println)
 
 //  Api.positionApi.closePosition(AccountID("001-004-1442547-003"), InstrumentName("EUR_USD"), ClosePositionRequest(shortUnits = Some("ALL")))

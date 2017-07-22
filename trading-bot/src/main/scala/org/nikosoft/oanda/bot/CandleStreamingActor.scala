@@ -26,21 +26,21 @@ class CandleStreamingActor(next: ActorRef, chart: Chart) extends Actor {
         .candles(
           instrument = InstrumentName(chart.instrument),
           granularity = chart.granularity,
-//          count = (chart._candles.isEmpty ? 5000 | 2).some
-          count = None,
-          from = Some(DateTime("2017-07-16T00:00:00Z")),
-          to = Some(DateTime("2017-07-17T00:00:00Z"))
+          count = (chart._candles.isEmpty ? 5000 | 2).some
+//          count = None,
+//          from = Some(DateTime("2017-07-16T00:00:00Z")),
+//          to = Some(DateTime("2017-07-17T00:00:00Z"))
         )
 
       candlesResponse.map(_.candles
         .flatMap(candle => candle.mid.map(toCandleStick(candle, _)))
         .filter(_.complete)
         .flatMap(chart.addCandleStick)
-      ).foreach {
+      ).fold(err => println(err), {
         case lastCandle +: Nil => next ! lastCandle
         case candles @ lastCandle +: tail => next ! chart._candles
         case _ =>
-      }
+      })
 
   }
 
