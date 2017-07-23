@@ -11,7 +11,7 @@ object Launcher extends App {
   val chart = new Chart(
     accountId = "001-004-1442547-003",
     instrument = "EUR_USD",
-    granularity = CandlestickGranularity.M1,
+    granularity = CandlestickGranularity.H1,
     indicators = Seq(
       new MACDCandleCloseIndicator(),
       new RSICandleCloseIndicator(14),

@@ -1,6 +1,7 @@
 package org.nikosoft.oanda.bot.scalpers
 
 import akka.actor.{Actor, PoisonPill}
+import org.joda.time.Instant
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.OrderModel.{MarketOrderRequest, TimeInForce}
@@ -99,10 +100,12 @@ class MACDScalperActor(chart: Chart) extends Actor {
 
     val avgFee = 13
     val aggregated = stats.trades
-      .map(trade => (trade.long ? "long" | "short", trade.entry.close, trade.exit.close, trade.profit))
+      .map(trade => (trade.long ? "long" | "short", trade.entry.time, trade.entry.close, trade.exit.time, trade.exit.close, trade.profit))
     aggregated.foreach(println)
-    val totalLoss = aggregated.collect { case (_, _, _, profit) if profit < 0 => profit }.sum
-    val totalProfit = aggregated.collect { case (_, _, _, profit) if profit > 0 => profit }.sum
+    val grouped = aggregated.map { case (_, time, _, _, _, profit) => (s"${time.toDateTime.getYear}/${time.toDateTime.getMonthOfYear}", profit) }.groupBy(_._1).mapValues(_.map(_._2).sum).toList.sortBy(_._1)
+    grouped.foreach(println)
+    val totalLoss = aggregated.collect { case (_, _, _, _, _, profit) if profit < 0 => profit }.sum
+    val totalProfit = aggregated.collect { case (_, _, _, _, _, profit) if profit > 0 => profit }.sum
     val total = totalProfit + totalLoss
     val totalFees = avgFee * aggregated.size
     println(s"Total trades ${aggregated.size}, total profit $totalProfit, total loss $totalLoss, result $total, fees $totalFees, grand total ${total - totalFees}")
@@ -151,8 +154,8 @@ class MACDScalperActor(chart: Chart) extends Actor {
   } yield {
 //    if (stochastic > 10 && prevStochastic < 10 && (macdValue > prevMacdValue)) OpenLongPosition
 //    else if (stochastic < 90 && prevStochastic > 90 && (macdValue < prevMacdValue)) OpenShortPosition
-    if (macdHistogram > 0) OpenLongPosition
-    else if (macdHistogram < 0) OpenShortPosition
+    if (prevMacdHistogram < 0 && macdHistogram > 0) OpenLongPosition
+    else if (prevMacdHistogram > 0 && macdHistogram < 0) OpenShortPosition
     else DoNothing
   }
 
@@ -170,8 +173,8 @@ class MACDScalperActor(chart: Chart) extends Actor {
     atr <- candle.indicator[ATRCandleIndicator, BigDecimal]("14").map(_.rnd)
   } yield {
     if (
-      (long && (stochastic > 90)) ||
-      (!long && (stochastic < 10))
+      (long && (prevMacdHistogram > 0 && macdHistogram < 0)) ||
+      (!long && (prevMacdHistogram < 0 && macdHistogram > 0))
     //      (stochastic > 90 && prevStochastic < 90) || (stochastic < 10 && prevStochastic > 10)
     ) true
     else false
