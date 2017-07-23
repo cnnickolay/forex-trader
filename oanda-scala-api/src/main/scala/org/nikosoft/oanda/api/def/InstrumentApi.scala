@@ -46,7 +46,7 @@ trait InstrumentApi {
   def candles(instrument: InstrumentName,
               price: String = "M",
               granularity: CandlestickGranularity = S5,
-              count: Option[Int] = 500.some,
+              count: Option[Int] = None,
               from: Option[DateTime] = None,
               to: Option[DateTime] = None,
               smooth: Boolean = false,

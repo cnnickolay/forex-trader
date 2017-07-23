@@ -27,8 +27,12 @@ object MACDScalperActor {
 
   case object DoNothing extends OpenPosition
 
-  case class TrainingTrade(long: Boolean, entry: CandleStick, exit: CandleStick)
-  case class TrainingStatistics(profitPips: Int = 0, lossPips: Int = 0, openedLong: Option[CandleStick] = None, openedShort: Option[CandleStick] = None, trades: Seq[TrainingTrade] = Seq.empty)
+  case class TrainingTrade(long: Boolean, entry: CandleStick, exit: CandleStick, profit: Int)
+  case class TrainingStatistics(profitPips: Int = 0,
+                                lossPips: Int = 0,
+                                openedLong: Option[CandleStick] = None,
+                                openedShort: Option[CandleStick] = None,
+                                trades: Seq[TrainingTrade] = Seq.empty)
 
 }
 
@@ -41,7 +45,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
   val tradingUnits = 100
   var currentSpread: Int = _
   val maxSpread = 15
-  private val stochasticSettings = "5_3_2"
+  private val stochasticSettings = "20_3_3"
 
   override def preStart(): Unit = {
     updatePosition()
@@ -49,69 +53,86 @@ class MACDScalperActor(chart: Chart) extends Actor {
   }
 
   def receive: Receive = {
-    case candles: Seq[CandleStick] =>
-      val (_, stats) = candles.reverse.foldLeft((Seq.empty[CandleStick], TrainingStatistics())) {
-        case ((historicalCandles, _stats@TrainingStatistics(_, _, None, None, _)), candle) =>
-          val toppedUpHistoricalCandles = candle +: historicalCandles
-          considerOpeningPosition(toppedUpHistoricalCandles) match {
-            case Some(OpenLongPosition) => (toppedUpHistoricalCandles, _stats.copy(openedLong = Some(candle)))
-            case Some(OpenShortPosition) => (toppedUpHistoricalCandles, _stats.copy(openedShort = Some(candle)))
-            case _ => (toppedUpHistoricalCandles, _stats)
+    case candles: Seq[CandleStick] => processCandleSeq(candles)
+    case candle: CandleStick => processCandle(candle)
+    case price: Price => processPrice(price)
+
+  }
+
+  private def processCandleSeq(candles: Seq[CandleStick]): Unit = {
+    val (_, stats) = candles.reverse.foldLeft((Seq.empty[CandleStick], TrainingStatistics())) {
+      case ((historicalCandles, _stats@TrainingStatistics(_, _, None, None, _)), candle) =>
+        val toppedUpHistoricalCandles = candle +: historicalCandles
+        considerOpeningPosition(toppedUpHistoricalCandles) match {
+          case Some(OpenLongPosition) => (toppedUpHistoricalCandles, _stats.copy(openedLong = Some(candle)))
+          case Some(OpenShortPosition) => (toppedUpHistoricalCandles, _stats.copy(openedShort = Some(candle)))
+          case _ => (toppedUpHistoricalCandles, _stats)
+        }
+
+      case ((historicalCandles, _stats@TrainingStatistics(_, _, longPosition, shortPosition, _)), exitCandle) =>
+        val toppedUpHistoricalCandles = exitCandle +: historicalCandles
+        val gainLoss = (longPosition, shortPosition) match {
+          case (Some(_openedAt), None) => exitCandle.close - _openedAt.close
+          case (None, Some(_openedAt)) => _openedAt.close - exitCandle.close
+        }
+
+        if (considerClosingPosition(toppedUpHistoricalCandles, gainLoss, longPosition.isDefined)) {
+          val (trade, openedAt) = (longPosition, shortPosition) match {
+            case (Some(_openedAt), None) => (((exitCandle.close - _openedAt.close) * 100000).toInt, _openedAt)
+            case (None, Some(_openedAt)) => (((_openedAt.close - exitCandle.close) * 100000).toInt, _openedAt)
           }
 
-        case ((historicalCandles, _stats@TrainingStatistics(_, _, longPosition, shortPosition, _)), exitCandle) =>
-          val toppedUpHistoricalCandles = exitCandle +: historicalCandles
-          val gainLoss = (longPosition, shortPosition) match {
-            case (Some(_openedAt), None) => exitCandle.close - _openedAt.close
-            case (None, Some(_openedAt)) => _openedAt.close - exitCandle.close
-          }
+          val profitPips = (trade > 0) ? (_stats.profitPips + trade) | _stats.profitPips
+          val lossPips = (trade < 0) ? (_stats.lossPips + (-trade)) | _stats.lossPips
+          val entry = _stats.openedLong.orElse(_stats.openedShort).get.copy(indicators = Map.empty)
+          val exit = exitCandle.copy(indicators = Map.empty)
+          val isLong = _stats.openedLong.isDefined
+          (
+            toppedUpHistoricalCandles,
+            _stats.copy(profitPips = profitPips, lossPips = lossPips, openedLong = None, openedShort = None,
+              trades = TrainingTrade(
+                isLong, entry, exit,
+                isLong ? (exit.close.abs - entry.close.abs).toPips | (-1 * (exit.close.abs - entry.close.abs)).toPips) +: _stats.trades)
+            )
+        } else (toppedUpHistoricalCandles, _stats)
+    }
 
-          if (considerClosingPosition(toppedUpHistoricalCandles, gainLoss)) {
-            val (trade, openedAt) = (longPosition, shortPosition) match {
-              case (Some(_openedAt), None) =>
-                println(s"long position at ${_openedAt.time}, closed at ${exitCandle.time}, ${exitCandle.close - _openedAt.close}")
-                (((exitCandle.close - _openedAt.close) * 100000).toInt, _openedAt)
-              case (None, Some(_openedAt)) =>
-                println(s"short position at ${_openedAt.time}, closed at ${exitCandle.time}, ${exitCandle.close - _openedAt.close}")
-                (((_openedAt.close - exitCandle.close) * 100000).toInt, _openedAt)
-            }
+    val avgFee = 13
+    val aggregated = stats.trades
+      .map(trade => (trade.long ? "long" | "short", trade.entry.close, trade.exit.close, trade.profit))
+    aggregated.foreach(println)
+    val totalLoss = aggregated.collect { case (_, _, _, profit) if profit < 0 => profit }.sum
+    val totalProfit = aggregated.collect { case (_, _, _, profit) if profit > 0 => profit }.sum
+    val total = totalProfit + totalLoss
+    val totalFees = avgFee * aggregated.size
+    println(s"Total trades ${aggregated.size}, total profit $totalProfit, total loss $totalLoss, result $total, fees $totalFees, grand total ${total - totalFees}")
+    println("Starting trading.........")
 
-            val profitPips = (trade > 0) ? (_stats.profitPips + trade) | _stats.profitPips
-            val lossPips = (trade < 0) ? (_stats.lossPips + (-trade)) | _stats.lossPips
-            (toppedUpHistoricalCandles,
-              _stats.copy(profitPips = profitPips, lossPips = lossPips, openedLong = None, openedShort = None,
-                trades = TrainingTrade(_stats.openedLong.isDefined, _stats.openedLong.orElse(_stats.openedShort).get, exitCandle) +: _stats.trades))
-          } else (toppedUpHistoricalCandles, _stats)
-      }
+    System.exit(0)
+  }
 
-      val fees = stats.trades.size * 13
-      println(s"Profit ${stats.profitPips}, loss ${stats.lossPips}, diff ${stats.profitPips - stats.lossPips}, fees $fees, total ${(stats.profitPips - stats.lossPips) - fees}")
-      println("Starting trading.........")
+  def processPrice(price: Price): Unit = {
+    (price.asks.headOption.map(_.price.value) |@| price.bids.headOption.map(_.price.value)) (_ - _) match {
+      case Some(spread) => currentSpread = (spread * 100000).toInt
+      case None =>
+    }
+  }
 
-      System.exit(0)
+  private def processCandle(candle: CandleStick): Unit = {
+    println(s"Candle received at ${candle.time}, close price ${candle.close}")
+    allCandles = candle +: allCandles
 
-    case candle: CandleStick =>
-      println(s"Candle received at ${candle.time}, close price ${candle.close}")
-      allCandles = candle +: allCandles
-
-      positionOption.fold {
-        if (currentSpread <= maxSpread)
-          considerOpeningPosition(allCandles) match {
-            case (Some(OpenLongPosition)) => println("Opening long position"); openLongPosition(tradingUnits)
-            case (Some(OpenShortPosition)) => println("Opening short position"); openShortPosition(tradingUnits)
-            case _ =>
-          }
-      }(_ => if (considerClosingPosition(allCandles)) {
-        println("Closing position")
-        closePositions()
-      })
-
-    case price: Price =>
-      (price.asks.headOption.map(_.price.value) |@| price.bids.headOption.map(_.price.value)) (_ - _) match {
-        case Some(spread) => currentSpread = (spread * 100000).toInt
-        case None =>
-      }
-
+    positionOption.fold {
+      if (currentSpread <= maxSpread)
+        considerOpeningPosition(allCandles) match {
+          case (Some(OpenLongPosition)) => println("Opening long position"); openLongPosition(tradingUnits)
+          case (Some(OpenShortPosition)) => println("Opening short position"); openShortPosition(tradingUnits)
+          case _ =>
+        }
+    }(position => if (considerClosingPosition(lastCandles = allCandles, long = isLongPosition(position))) {
+      println("Closing position")
+      closePositions()
+    })
   }
 
   def considerOpeningPosition(lastCandles: Seq[CandleStick]): Option[OpenPosition] = for {
@@ -128,12 +149,14 @@ class MACDScalperActor(chart: Chart) extends Actor {
     stochastic <- candle.indicator[StochasticCandleIndicator, BigDecimal](stochasticSettings)
     prevStochastic <- previousCandle.indicator[StochasticCandleIndicator, BigDecimal](stochasticSettings)
   } yield {
-    if (stochastic > 10 && prevStochastic < 10 && prevMacdValue < macdValue) OpenLongPosition
-    else if (stochastic < 90 && prevStochastic > 90 && prevMacdValue > macdValue) OpenShortPosition
+//    if (stochastic > 10 && prevStochastic < 10 && (macdValue > prevMacdValue)) OpenLongPosition
+//    else if (stochastic < 90 && prevStochastic > 90 && (macdValue < prevMacdValue)) OpenShortPosition
+    if (macdHistogram > 0) OpenLongPosition
+    else if (macdHistogram < 0) OpenShortPosition
     else DoNothing
   }
 
-  def considerClosingPosition(lastCandles: Seq[CandleStick], gainLoss: BigDecimal = 0): Boolean = (for {
+  def considerClosingPosition(lastCandles: Seq[CandleStick], gainLoss: BigDecimal = 0, long: Boolean): Boolean = (for {
     candle <- lastCandles.headOption
     previousCandle <- lastCandles.tail.headOption
     macd <- candle.indicator[MACDCandleCloseIndicator, MACDItem](None)
@@ -147,8 +170,9 @@ class MACDScalperActor(chart: Chart) extends Actor {
     atr <- candle.indicator[ATRCandleIndicator, BigDecimal]("14").map(_.rnd)
   } yield {
     if (
-      (stochastic > 90 && prevStochastic < 90) || (stochastic < 10 && prevStochastic > 10) || (gainLoss < -0.0023)
-//      prevMacdValue > 0 && macdValue < 0
+      (long && (stochastic > 90)) ||
+      (!long && (stochastic < 10))
+    //      (stochastic > 90 && prevStochastic < 90) || (stochastic < 10 && prevStochastic > 10)
     ) true
     else false
   }).getOrElse(false)
@@ -186,6 +210,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
 
   implicit class BigDecimalPimp(value: BigDecimal) {
     def rnd: BigDecimal = value.setScale(5, HALF_DOWN)
+    def toPips: Int = (value * 100000).toInt
   }
 
   private def isLongPosition(position: Position) = position.long.tradeIDs.nonEmpty

@@ -1,5 +1,5 @@
 # Forex Trader
-OANDA powered forex trading bot will make you rich! :-D
+OANDA powered forex trading bot will make you rich!
 
 ### What this bot does?
 The bot reads trading data from oanda, calculates different indicators and applies trading strategies. 
@@ -18,9 +18,9 @@ When I'm writing this readme there are only few indicators are implemented, thos
 
 Existing java libraries for calculating those indicators are extremely ugly, so I had no choice but to reinvent the wheel here.
 #### Trading strategies
-So far there is nothing implemented, I only started playing around with data. I'm trying MACD on 5-minute candles and having some decent results.
+I'm implementing some basic scalpers right now
 
-Later I might try some Machine Learning techniques with Apache Spark. 
+Later I might try some Machine Learning techniques with Apache Spark.
 
 ### Contact
 If you want to contribute with good ideas, email to me and let's discuss getting rich strategies.

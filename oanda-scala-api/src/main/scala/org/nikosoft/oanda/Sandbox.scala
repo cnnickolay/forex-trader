@@ -70,10 +70,12 @@ object Sandbox extends App {
     .candles(
       instrument = InstrumentName("EUR_USD"),
       granularity = CandlestickGranularity.M1,
-      count = Some(500)
-//      from = Some(DateTime("2017-07-04T00:00:00Z")),
-//      to = Some(DateTime("2017-07-05T00:00:00Z"))
-    ).fold(println, println)
+//      count = Some(500)
+      from = Some(DateTime("2017-07-01T00:00:00Z")),
+      to = Some(DateTime("2017-07-05T00:00:00Z"))
+    ).fold(println, response => {
+    response.candles.take(10).foreach(println)
+  })
 
 //  Api.positionApi.closePosition(AccountID("001-004-1442547-003"), InstrumentName("EUR_USD"), ClosePositionRequest(shortUnits = Some("ALL")))
 }
