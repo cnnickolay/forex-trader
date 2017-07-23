@@ -19,7 +19,7 @@ object Launcher extends App {
       new EMACandleCloseIndicator(100),
       new ATRCandleIndicator(14),
       new CMOCandleCloseIndicator(21),
-      new StochasticCandleIndicator(20, Some(3), Some(3))
+      new StochasticCandleIndicator(14, Some(3), None)
     )
      /*++ (for {
       range <- 3 to 7

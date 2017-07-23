@@ -46,7 +46,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
   val tradingUnits = 100
   var currentSpread: Int = _
   val maxSpread = 15
-  private val stochasticSettings = "20_3_3"
+  private val stochasticSettings = "14_3"
 
   override def preStart(): Unit = {
     updatePosition()
@@ -73,12 +73,12 @@ class MACDScalperActor(chart: Chart) extends Actor {
       case ((historicalCandles, _stats@TrainingStatistics(_, _, longPosition, shortPosition, _)), exitCandle) =>
         val toppedUpHistoricalCandles = exitCandle +: historicalCandles
         val gainLoss = (longPosition, shortPosition) match {
-          case (Some(_openedAt), None) => exitCandle.close - _openedAt.close
-          case (None, Some(_openedAt)) => _openedAt.close - exitCandle.close
+          case (Some(_openedAt), None) => (exitCandle.close.abs - _openedAt.close.abs).toPips
+          case (None, Some(_openedAt)) => (exitCandle.close.abs - _openedAt.close.abs).toPips * -1
         }
 
         if (considerClosingPosition(toppedUpHistoricalCandles, gainLoss, longPosition.isDefined)) {
-          val (trade, openedAt) = (longPosition, shortPosition) match {
+          val (trade, _) = (longPosition, shortPosition) match {
             case (Some(_openedAt), None) => (((exitCandle.close - _openedAt.close) * 100000).toInt, _openedAt)
             case (None, Some(_openedAt)) => (((_openedAt.close - exitCandle.close) * 100000).toInt, _openedAt)
           }
@@ -152,14 +152,12 @@ class MACDScalperActor(chart: Chart) extends Actor {
     stochastic <- candle.indicator[StochasticCandleIndicator, BigDecimal](stochasticSettings)
     prevStochastic <- previousCandle.indicator[StochasticCandleIndicator, BigDecimal](stochasticSettings)
   } yield {
-//    if (stochastic > 10 && prevStochastic < 10 && (macdValue > prevMacdValue)) OpenLongPosition
-//    else if (stochastic < 90 && prevStochastic > 90 && (macdValue < prevMacdValue)) OpenShortPosition
-    if (prevMacdHistogram < 0 && macdHistogram > 0) OpenLongPosition
-    else if (prevMacdHistogram > 0 && macdHistogram < 0) OpenShortPosition
+    if (prevStochastic > 15 && stochastic < 15) OpenLongPosition
+    else if (prevStochastic < 85 && stochastic > 85) OpenShortPosition
     else DoNothing
   }
 
-  def considerClosingPosition(lastCandles: Seq[CandleStick], gainLoss: BigDecimal = 0, long: Boolean): Boolean = (for {
+  def considerClosingPosition(lastCandles: Seq[CandleStick], gainLoss: Int = 0, long: Boolean): Boolean = (for {
     candle <- lastCandles.headOption
     previousCandle <- lastCandles.tail.headOption
     macd <- candle.indicator[MACDCandleCloseIndicator, MACDItem](None)
@@ -173,8 +171,8 @@ class MACDScalperActor(chart: Chart) extends Actor {
     atr <- candle.indicator[ATRCandleIndicator, BigDecimal]("14").map(_.rnd)
   } yield {
     if (
-      (long && (prevMacdHistogram > 0 && macdHistogram < 0)) ||
-      (!long && (prevMacdHistogram < 0 && macdHistogram > 0))
+      (long && (prevStochastic < 85 && stochastic > 85)) ||
+      (!long && (prevStochastic > 15 && stochastic < 15))
     //      (stochastic > 90 && prevStochastic < 90) || (stochastic < 10 && prevStochastic > 10)
     ) true
     else false
