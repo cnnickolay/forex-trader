@@ -1,6 +1,6 @@
 name := "oanda-trader"
 
-version := "0.01"
+version := "0.02"
 
 scalaVersion := "2.12.2"
 

@@ -46,7 +46,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
   val tradingUnits = 100
   var currentSpread: Int = _
   val maxSpread = 15
-  private val stochasticSettings = "14_3"
+  private val stochasticSettings = "5_3_3"
 
   override def preStart(): Unit = {
     updatePosition()
@@ -102,7 +102,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
     val aggregated = stats.trades
       .map(trade => (trade.long ? "long" | "short", trade.entry.time, trade.entry.close, trade.exit.time, trade.exit.close, trade.profit))
     aggregated.foreach(println)
-    val grouped = aggregated.map { case (_, time, _, _, _, profit) => (s"${time.toDateTime.getYear}/${time.toDateTime.getMonthOfYear}", profit) }.groupBy(_._1).mapValues(_.map(_._2).sum).toList.sortBy(_._1)
+    val grouped = aggregated.map { case (_, time, _, _, _, profit) => (s"${time.toDateTime.getYear}/${time.toDateTime.getMonthOfYear}/${time.toDateTime.getDayOfMonth}", profit) }.groupBy(_._1).mapValues(_.map(_._2).sum).toList.sortBy(_._1)
     grouped.foreach(println)
     val totalLoss = aggregated.collect { case (_, _, _, _, _, profit) if profit < 0 => profit }.sum
     val totalProfit = aggregated.collect { case (_, _, _, _, _, profit) if profit > 0 => profit }.sum
@@ -110,8 +110,6 @@ class MACDScalperActor(chart: Chart) extends Actor {
     val totalFees = avgFee * aggregated.size
     println(s"Total trades ${aggregated.size}, total profit $totalProfit, total loss $totalLoss, result $total, fees $totalFees, grand total ${total - totalFees}")
     println("Starting trading.........")
-
-    System.exit(0)
   }
 
   def processPrice(price: Price): Unit = {
@@ -152,8 +150,8 @@ class MACDScalperActor(chart: Chart) extends Actor {
     stochastic <- candle.indicator[StochasticCandleIndicator, BigDecimal](stochasticSettings)
     prevStochastic <- previousCandle.indicator[StochasticCandleIndicator, BigDecimal](stochasticSettings)
   } yield {
-    if (prevStochastic > 15 && stochastic < 15) OpenLongPosition
-    else if (prevStochastic < 85 && stochastic > 85) OpenShortPosition
+    if (prevStochastic > 10 && stochastic < 10) OpenLongPosition
+    else if (prevStochastic < 90 && stochastic > 90) OpenShortPosition
     else DoNothing
   }
 
@@ -171,8 +169,8 @@ class MACDScalperActor(chart: Chart) extends Actor {
     atr <- candle.indicator[ATRCandleIndicator, BigDecimal]("14").map(_.rnd)
   } yield {
     if (
-      (long && (prevStochastic < 85 && stochastic > 85)) ||
-      (!long && (prevStochastic > 15 && stochastic < 15))
+      (long && (prevStochastic < 90 && stochastic > 90)) ||
+      (!long && (prevStochastic > 10 && stochastic < 10))
     //      (stochastic > 90 && prevStochastic < 90) || (stochastic < 10 && prevStochastic > 10)
     ) true
     else false
