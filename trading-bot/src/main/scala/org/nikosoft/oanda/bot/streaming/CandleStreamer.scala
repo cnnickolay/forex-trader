@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.scaladsl.{Flow, Framing, GraphDSL, Merge, RunnableGraph, Sink}
-import akka.stream.{ActorMaterializer, ClosedShape}
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings, ClosedShape, Supervision}
 import akka.util.ByteString
 import org.nikosoft.oanda.api.{Api, JsonSerializers}
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
@@ -21,8 +21,14 @@ object CandleStreamer extends App {
   implicit val formats = JsonSerializers.formats
   import org.json4s.native.Serialization._
 
+  val decider: Supervision.Decider = { e =>
+    e.printStackTrace()
+    Supervision.Stop
+  }
+
   implicit val actorSystem = ActorSystem("streamer")
-  implicit val materializer = ActorMaterializer()
+  private val strategy = ActorMaterializerSettings(actorSystem).withSupervisionStrategy(decider)
+  implicit val materializer = ActorMaterializer(strategy)
 
   val accountId = AccountID("001-004-1442547-003")
   val eurUsd = InstrumentName("EUR_USD")
