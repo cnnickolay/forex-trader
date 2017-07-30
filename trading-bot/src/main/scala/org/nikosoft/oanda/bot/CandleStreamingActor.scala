@@ -4,16 +4,12 @@ import akka.actor.{Actor, ActorRef}
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.{Candlestick, CandlestickData}
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.{DateTime, InstrumentName}
-import org.nikosoft.oanda.bot.CandleStreamingActor.Tick
+import org.nikosoft.oanda.bot.CommonCommands.Tick
 import org.nikosoft.oanda.instruments.Model._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationLong
 import scalaz.Scalaz._
-
-object CandleStreamingActor {
-  case object Tick
-}
 
 class CandleStreamingActor(next: ActorRef, chart: Chart) extends Actor {
   override def preStart() = {
@@ -27,8 +23,6 @@ class CandleStreamingActor(next: ActorRef, chart: Chart) extends Actor {
           instrument = InstrumentName(chart.instrument),
           granularity = chart.granularity,
           count = (chart._candles.isEmpty ? 5000 | 2).some
-//          from = Some(DateTime("2017-06-10T00:00:00Z")),
-//          to = Some(DateTime("2017-06-15T00:00:00Z"))
         )
 
       candlesResponse.map(_.candles

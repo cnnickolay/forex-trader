@@ -1,7 +1,7 @@
 package org.nikosoft.oanda.bot.scalpers
 
 import akka.actor.{Actor, PoisonPill}
-import org.joda.time.Instant
+import org.joda.time.{Instant, Minutes}
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.OrderModel.{MarketOrderRequest, TimeInForce}
@@ -43,7 +43,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
 
   var allCandles: Seq[CandleStick] = Seq.empty
   var positionOption: Option[Position] = None
-  val tradingUnits = 100
+  val tradingUnits = 200
   var currentSpread: Int = _
   val maxSpread = 15
   private val stochasticSettings = "5_3_3"
@@ -76,8 +76,11 @@ class MACDScalperActor(chart: Chart) extends Actor {
           case (Some(_openedAt), None) => (exitCandle.close.abs - _openedAt.close.abs).toPips
           case (None, Some(_openedAt)) => (exitCandle.close.abs - _openedAt.close.abs).toPips * -1
         }
-
-        if (considerClosingPosition(toppedUpHistoricalCandles, gainLoss, longPosition.isDefined)) {
+        val minutesPassed = (longPosition, shortPosition) match {
+          case (Some(_openedAt), None) => Minutes.minutesBetween(_openedAt.time, exitCandle.time).toStandardDuration.getStandardMinutes
+          case (None, Some(_openedAt)) => Minutes.minutesBetween(_openedAt.time, exitCandle.time).toStandardDuration.getStandardMinutes
+        }
+        if (considerClosingPosition(toppedUpHistoricalCandles, gainLoss, longPosition.isDefined, minutesPassed)) {
           val (trade, _) = (longPosition, shortPosition) match {
             case (Some(_openedAt), None) => (((exitCandle.close - _openedAt.close) * 100000).toInt, _openedAt)
             case (None, Some(_openedAt)) => (((_openedAt.close - exitCandle.close) * 100000).toInt, _openedAt)
@@ -155,7 +158,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
     else DoNothing
   }
 
-  def considerClosingPosition(lastCandles: Seq[CandleStick], gainLoss: Int = 0, long: Boolean): Boolean = (for {
+  def considerClosingPosition(lastCandles: Seq[CandleStick], gainLoss: Int = 0, long: Boolean, minutesPassed: Long = -1): Boolean = (for {
     candle <- lastCandles.headOption
     previousCandle <- lastCandles.tail.headOption
     macd <- candle.indicator[MACDCandleCloseIndicator, MACDItem](None)
@@ -168,11 +171,7 @@ class MACDScalperActor(chart: Chart) extends Actor {
     prevStochastic <- previousCandle.indicator[StochasticCandleIndicator, BigDecimal](stochasticSettings)
     atr <- candle.indicator[ATRCandleIndicator, BigDecimal]("14").map(_.rnd)
   } yield {
-    if (
-      (long && (prevStochastic < 90 && stochastic > 90)) ||
-      (!long && (prevStochastic > 10 && stochastic < 10))
-    //      (stochastic > 90 && prevStochastic < 90) || (stochastic < 10 && prevStochastic > 10)
-    ) true
+    if (minutesPassed == 5) true
     else false
   }).getOrElse(false)
 

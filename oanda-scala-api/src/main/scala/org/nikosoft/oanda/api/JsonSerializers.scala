@@ -126,7 +126,7 @@ object JsonSerializers {
     }
   }
 
-  private[api] def formats = formatsHints +
+  private[oanda] def formats = formatsHints +
     StringToDouble +
     StringToBigDecimal +
     LongSerializer +

@@ -3,6 +3,12 @@ package org.nikosoft.oanda.api.impl
 import java.io.{BufferedReader, InputStreamReader}
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 
+import akka.NotUsed
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.headers.RawHeader
+import akka.stream.{ActorMaterializer, OverflowStrategy, SourceShape}
+import akka.stream.scaladsl.{GraphDSL, Sink, Source}
 import org.apache.http.HttpResponse
 import org.apache.http.client.fluent.Request
 import org.nikosoft.oanda.api.ApiCommons
@@ -14,7 +20,7 @@ import org.nikosoft.oanda.api.`def`.PricingApi
 import org.nikosoft.oanda.api.`def`.PricingApi.{PricingOrHeartbeat, PricingResponse}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import scalaz.Scalaz._
 import scalaz.{-\/, \/, \/-}
 
@@ -85,4 +91,15 @@ private[api] object PricingApiImpl extends PricingApi with ApiCommons {
     }
     queue
   }
+
+  /**
+    * Get a stream of Account Prices starting from when the request is made. This pricing stream does not include every single price created for the Account, but instead will provide at most 4 prices per second (every 250 milliseconds) for each instrument being requested. If more than one price is created for an instrument during the 250 millisecond window, only the price in effect at the end of the window is sent. This means that during periods of rapid price movement, subscribers to this stream will not be sent every price. Pricing windows for different connections to the price stream are not all aligned in the same way (i.e. they are not all aligned to the top of the second). This means that during periods of rapid price movement, different subscribers may observe different prices depending on their alignment. Note: This endpoint is served by the streaming URLs.
+    *
+    * @param accountId   Account Identifier [required]
+    * @param instruments List of Instruments to stream Prices for. [required]
+    * @param snapshot    Flag that enables/disables the sending of a pricing snapshot when initially connecting to the stream. [default=True]
+    * @return Connecting to the Price Stream was successful.
+    *         The response body for the Pricing Stream uses chunked transfer encoding. Each chunk contains Price and/or PricingHeartbeat objects encoded as JSON. Each JSON object is serialized into a single line of text, and multiple objects found in the same chunk are separated by newlines. Heartbeats are sent every 5 seconds.
+    */
+  def pricingStreamAkka(accountId: AccountID, instruments: Seq[InstrumentName], snapshot: Boolean)(implicit actorMaterializer: ActorMaterializer): Source[PricingOrHeartbeat, NotUsed] = ???
 }

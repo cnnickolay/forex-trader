@@ -8,6 +8,7 @@ import org.nikosoft.oanda.instruments.Model.Chart
 object ManagerActor {
   def instrumentStreamingActorProps(next: ActorRef, chart: Chart) = Props.create(classOf[InstrumentStreamingActor], next, chart: Chart)
   def candleStreamingActorProps(next: ActorRef, chart: Chart) = Props.create(classOf[CandleStreamingActor], next, chart: Chart)
+  def candleStreamingTesterActorProps(next: ActorRef, chart: Chart) = Props.create(classOf[CandleStreamingTesterActor], next, chart: Chart)
   def advisorActorProps(chart: Chart) = Props.create(classOf[AdvisorActor], chart)
   def scalperActorProps(chart: Chart) = Props.create(classOf[ScalperActor], chart)
   def macdScalperActorProps(chart: Chart) = Props.create(classOf[MACDScalperActor], chart)
@@ -26,6 +27,7 @@ class ManagerActor(chart: Chart) extends Actor {
     val macdScalperActor = context.actorOf(macdScalperActorProps(chart))
 
     context.actorOf(instrumentStreamingActorProps(macdScalperActor, chart)) ! StartActor
-    context.actorOf(candleStreamingActorProps(macdScalperActor, chart))
+    context.actorOf(candleStreamingTesterActorProps(macdScalperActor, chart))
+//    context.actorOf(candleStreamingActorProps(macdScalperActor, chart))
   }
 }

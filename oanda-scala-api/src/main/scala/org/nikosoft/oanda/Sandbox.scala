@@ -66,6 +66,7 @@ object Sandbox extends App {
 */
 
 
+/*
   Api.instrumentsApi
     .candles(
       instrument = InstrumentName("EUR_USD"),
@@ -76,6 +77,7 @@ object Sandbox extends App {
     ).fold(println, response => {
     response.candles.take(10).foreach(println)
   })
+*/
 
-//  Api.positionApi.closePosition(AccountID("001-004-1442547-003"), InstrumentName("EUR_USD"), ClosePositionRequest(shortUnits = Some("ALL")))
+  Api.positionApi.closePosition(AccountID("001-004-1442547-003"), InstrumentName("EUR_USD"), ClosePositionRequest(longUnits = Some("ALL")))
 }

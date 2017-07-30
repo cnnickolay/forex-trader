@@ -33,7 +33,7 @@ trait ApiCommons {
     val content = EntityUtils.toString(response.getEntity)
 
     response.getStatusLine.getStatusCode match {
-      case 200 => read[T](content).right
+      case code if code >= 200 && code < 300 => read[T](content).right
       case code => read[ApiErrorResponse](content).copy(code = code).left
     }
   }
