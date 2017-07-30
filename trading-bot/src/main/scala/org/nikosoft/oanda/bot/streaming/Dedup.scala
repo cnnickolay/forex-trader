@@ -1,7 +1,7 @@
 package org.nikosoft.oanda.bot.streaming
 
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, ClosedShape, FlowShape, SinkShape}
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 
 object Dedup extends App {
@@ -11,24 +11,15 @@ object Dedup extends App {
 
   val source = Source(List(1, 1, 1, 2, 2, 2, 2, 2, 3, 4, 4, 5, 6))
 
-  val flow = Flow.fromGraph(GraphDSL.create() { implicit builder =>
-    import GraphDSL.Implicits._
+  val flow = Flow[Int]
+    .sliding(2, 1)
+    .mapConcat { case prev +: current +: _=>
+        if (prev == current) Nil
+        else List(current)
+    }
 
-    val index = Source(Stream.from(1))
-    val zip = builder.add(Zip[Int, Int]())
-
-    index ~> zip.in0
-
-    val output = zip.out
-      .sliding(2, 1)
-      .mapConcat { case (idx, value) +: (prevIdx, prevValue) +: _ =>
-        if (prevIdx == 1) List(value, prevValue)
-        else if (value == prevValue) Nil
-        else List(value)
-      }
-
-    FlowShape(zip.in1, output.outlet)
-  })
-
-  source.via(flow).runWith(Sink.foreach(println))
+  // this value should be prepended to the source in order to avoid losing the first value
+  val ignoredValue = Int.MinValue
+  val prependedSource = Source.single(ignoredValue).concat(source)
+  prependedSource.via(flow).runWith(Sink.foreach(println))
 }
