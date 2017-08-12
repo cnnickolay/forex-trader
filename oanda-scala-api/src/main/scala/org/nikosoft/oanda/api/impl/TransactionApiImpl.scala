@@ -86,6 +86,7 @@ private[api] object TransactionApiImpl extends TransactionApi with ApiCommons {
 
     val queue = new LinkedBlockingQueue[TransactionOrHeartbeat]()
 
+/*
     Future {
       Request
         .Get(url)
@@ -106,6 +107,7 @@ private[api] object TransactionApiImpl extends TransactionApi with ApiCommons {
             }
         })
     }
+*/
     queue
   }
 

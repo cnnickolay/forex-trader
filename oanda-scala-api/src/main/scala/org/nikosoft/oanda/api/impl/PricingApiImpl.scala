@@ -69,6 +69,7 @@ private[api] object PricingApiImpl extends PricingApi with ApiCommons {
 
     val queue = new LinkedBlockingQueue[PricingOrHeartbeat]()
 
+/*
     Future {
       Request
         .Get(url)
@@ -89,6 +90,7 @@ private[api] object PricingApiImpl extends PricingApi with ApiCommons {
             }
         })
     }
+*/
     queue
   }
 
