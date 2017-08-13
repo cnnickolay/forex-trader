@@ -6,7 +6,7 @@ import org.json4s.ext.EnumNameSerializer
 import org.json4s.{CustomSerializer, DefaultFormats, _}
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountFinancingMode
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity
-import org.nikosoft.oanda.api.ApiModel.OrderModel._
+import org.nikosoft.oanda.api.ApiModel.OrderModel.{TrailingStopLossOrder, _}
 import org.nikosoft.oanda.api.ApiModel.PricingModel.{Price, PriceStatus, PricingHeartbeat}
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentType
 import org.nikosoft.oanda.api.ApiModel.TradeModel.TradeState
@@ -111,16 +111,16 @@ object JsonSerializers {
       }
 
       override def hintFor(clazz: Class[_]): String = clazz match {
-        case _: Class[TrailingStopLossOrder] => "TRAILING_STOP_LOSS"
-        case _: Class[StopLossOrder] => "STOP_LOSS"
-        case _: Class[TakeProfitOrder] => "TAKE_PROFIT"
-        case _: Class[MarketIfTouchedOrder] => "MARKET_IF_TOUCHED"
-        case _: Class[StopOrder] => "STOP"
-        case _: Class[LimitOrder] => "LIMIT"
-        case _: Class[MarketOrder] => "MARKET"
-        case _: Class[TransactionHeartbeat] => "HEARTBEAT"
-        case _: Class[Price] => "PRICE"
-        case _: Class[PricingHeartbeat] => "PRICING_HEARTBEAT"
+        case c if c == classOf[TrailingStopLossOrder] => "TRAILING_STOP_LOSS"
+        case c if c == classOf[StopLossOrder] => "STOP_LOSS"
+        case c if c == classOf[TakeProfitOrder] => "TAKE_PROFIT"
+        case c if c == classOf[MarketIfTouchedOrder] => "MARKET_IF_TOUCHED"
+        case c if c == classOf[StopOrder] => "STOP"
+        case c if c == classOf[LimitOrder] => "LIMIT"
+        case c if c == classOf[MarketOrder] => "MARKET"
+        case c if c == classOf[TransactionHeartbeat] => "HEARTBEAT"
+        case c if c == classOf[Price] => "PRICE"
+        case c if c == classOf[PricingHeartbeat] => "PRICING_HEARTBEAT"
         case c => transactionMappingsByClass(c)
       }
     }
