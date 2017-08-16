@@ -1,9 +1,18 @@
 package org.nikosoft.oanda.instruments
 
-import org.joda.time.Instant
+import java.nio.file.Paths
+import java.time.format.DateTimeFormatter
+
+import akka.NotUsed
+import akka.stream.{IOResult, scaladsl}
+import akka.stream.scaladsl.{FileIO, Flow, Framing, Source}
+import akka.util.ByteString
+import org.joda.time.{DateTimeField, DateTimeFieldType, Instant, LocalDateTime}
+import org.joda.time.format.{DateTimeFormat, DateTimeParser}
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity.CandlestickGranularity
 import org.nikosoft.oanda.instruments.Oscillators.{MACDItem, StochasticItem}
 
+import scala.concurrent.Future
 import scalaz.Scalaz._
 
 object Model {
@@ -104,6 +113,24 @@ object Model {
     def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: String)(implicit manifest: Manifest[T]): Option[OUTPUT] = indicator[T, OUTPUT](Some(conf))
   }
 
+  implicit class ChartPimp(chart: Chart) {
+    val formatter = DateTimeFormat.forPattern("yyyyMMdd HHmmss")
+
+    def streamCsv(filepath: String, delimiter: String): Source[CandleStick, Future[IOResult]] = {
+      val flow: Flow[ByteString, CandleStick, NotUsed] = Framing.delimiter(ByteString(System.lineSeparator), maximumFrameLength = 512, allowTruncation = true)
+        .map(_.utf8String)
+        .map(_.split(delimiter).toSeq.take(5))
+        .map { case date +: open +: high +: low +: close +: _ =>
+          val instant = LocalDateTime.parse(date, formatter).toDateTime.toInstant
+          CandleStick(instant, BigDecimal(open), BigDecimal(high), BigDecimal(low), BigDecimal(close), 0L, complete = true)
+        }
+        .mapConcat(chart.addCandleStick(_).toList)
+
+      val source: Source[ByteString, Future[IOResult]] = FileIO.fromPath(Paths.get(filepath))
+      source.via(flow)
+    }
+  }
+
   class Chart(val accountId: String,
               val instrument: String,
               val granularity: CandlestickGranularity,
@@ -117,6 +144,10 @@ object Model {
         candles = enrichedCandle +: candles
         enrichedCandle
       }
+//      (candle.time.get(DateTimeFieldType.hourOfDay) == 0 &&
+//        candle.time.get(DateTimeFieldType.minuteOfHour()) == 0 &&
+//        candle.time.get(DateTimeFieldType.secondOfMinute()) == 0
+//      ).option(println(candle.time))
 
       candles match {
         case Nil => add(candle)

@@ -1,14 +1,17 @@
 package org.nikosoft.oanda.bot
 
 import akka.actor.{ActorSystem, Props}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity
 import org.nikosoft.oanda.instruments.Model.{StochasticCandleIndicator, _}
 
 object Launcher extends App {
 
-  val actorSystem = ActorSystem("bot")
+  implicit val actorSystem = ActorSystem("streamer")
+  implicit val materializer = ActorMaterializer()
 
-  val chart = new Chart(
+  val source = new Chart(
     accountId = "001-004-1442547-003",
     instrument = "EUR_USD",
     granularity = CandlestickGranularity.M1,
@@ -21,12 +24,11 @@ object Launcher extends App {
       new CMOCandleCloseIndicator(21),
       new StochasticCandleIndicator(5, Some(3), Some(3))
     )
-     /*++ (for {
-      range <- 3 to 7
-      smoothing <- 3 to 4
-      secondSmoothing <- 3 to 4
-    } yield new StochasticCandleIndicator(range, Some(smoothing), Some(secondSmoothing)))*/
-  )
+  ).streamCsv("/Users/niko/projects/oanda-trader/data/EURUSD.csv", ";")
 
-  val managerActor = actorSystem.actorOf(Props.create(classOf[ManagerActor], chart), "manager-actor")
+  val sink = Sink.foreach[CandleStick](_ => {})
+
+  source.runWith(sink)
+
+//  val managerActor = actorSystem.actorOf(Props.create(classOf[ManagerActor], chart), "manager-actor")
 }
