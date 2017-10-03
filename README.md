@@ -1,3 +1,5 @@
+# Sorry folks, the project is not finished yet!
+
 # Forex Trader
 OANDA powered forex trading bot will make you rich!
 
