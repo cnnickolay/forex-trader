@@ -9,6 +9,7 @@ import akka.stream.scaladsl.{FileIO, Flow, Framing, Source}
 import akka.util.ByteString
 import org.joda.time.{DateTimeField, DateTimeFieldType, Instant, LocalDateTime}
 import org.joda.time.format.{DateTimeFormat, DateTimeParser}
+import org.nikosoft.oanda.api.ApiModel.InstrumentModel.{Candlestick, CandlestickData}
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity.CandlestickGranularity
 import org.nikosoft.oanda.instruments.Oscillators.{MACDItem, StochasticItem}
 
@@ -113,6 +114,10 @@ object Model {
     def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: String)(implicit manifest: Manifest[T]): Option[OUTPUT] = indicator[T, OUTPUT](Some(conf))
   }
 
+  object CandleStick {
+    def toCandleStick(candle: Candlestick, c: CandlestickData): CandleStick = CandleStick(candle.time.toInstant, c.o.value, c.h.value, c.l.value, c.c.value, candle.volume, candle.complete)
+  }
+
   implicit class ChartPimp(chart: Chart) {
     val formatter = DateTimeFormat.forPattern("yyyyMMdd HHmmss")
 
@@ -131,10 +136,7 @@ object Model {
     }
   }
 
-  class Chart(val accountId: String,
-              val instrument: String,
-              val granularity: CandlestickGranularity,
-              private var candles: Seq[CandleStick] = Seq.empty,
+  class Chart(private var candles: Seq[CandleStick] = Seq.empty,
               val indicators: Seq[Indicator[Seq[CandleStick], _]] = Seq.empty) {
 
     def addCandleStick(candle: CandleStick): Option[CandleStick] = {

@@ -12,9 +12,6 @@ object Launcher extends App {
   implicit val materializer = ActorMaterializer()
 
   val source = new Chart(
-    accountId = "001-004-1442547-003",
-    instrument = "EUR_USD",
-    granularity = CandlestickGranularity.M1,
     indicators = Seq(
       new MACDCandleCloseIndicator(),
       new RSICandleCloseIndicator(14),

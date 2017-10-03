@@ -1,5 +1,6 @@
 package org.nikosoft.oanda.instruments
 
+import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.Api
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.InstrumentModel.CandlestickGranularity
@@ -14,7 +15,7 @@ import scalaz.{-\/, \/-}
 
 object Main extends App {
 
-  private val accountId = AccountID("001-004-1442547-003")
+  private val accountId = AccountID(GlobalProperties.TradingAccountId)
   private val instrument = InstrumentName("EUR_USD")
 
   def openOrdersAndPositions = {
@@ -137,13 +138,13 @@ object Main extends App {
         .foreach { case (avg, granularity) => println(s"$granularity / $avg") }
   */
 
-  /*
+/*
     val \/-(closedPositions) = Api.positionApi.closePosition(
-      AccountID("001-004-1442547-003"),
+      AccountID(GlobalProperties.TradingAccountId),
       InstrumentName("EUR_USD"),
       ClosePositionRequest(shortUnits = Option("ALL"))
     )
-  */
+*/
 
   openOrdersAndPositions
 //    streamPrices()

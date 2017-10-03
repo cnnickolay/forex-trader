@@ -79,5 +79,5 @@ object Sandbox extends App {
   })
 */
 
-  Api.positionApi.closePosition(AccountID("001-004-1442547-003"), InstrumentName("EUR_USD"), ClosePositionRequest(longUnits = Some("ALL")))
+  Api.positionApi.closePosition(AccountID(GlobalProperties.TradingAccountId), InstrumentName("EUR_USD"), ClosePositionRequest(longUnits = Some("ALL")))
 }

@@ -11,6 +11,7 @@ import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.stream.javadsl.FramingTruncation
 import akka.stream.scaladsl.{Flow, Framing, GraphDSL, Merge, RunnableGraph, Sink, Source}
 import akka.util.ByteString
+import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 
@@ -24,7 +25,7 @@ object PriceStreamer extends App {
   implicit val actorSystem = ActorSystem("streamer")
   implicit val materializer = ActorMaterializer()
 
-  val accountId = AccountID("001-004-1442547-003")
+  val accountId = AccountID(GlobalProperties.TradingAccountId)
   val eurUsd = InstrumentName("EUR_USD")
   val usdGbp = InstrumentName("GBP_USD")
 
@@ -36,11 +37,11 @@ object PriceStreamer extends App {
 
   val eurUsdResponse = Http().singleRequest(HttpRequest(
     uri = s"https://stream-fxtrade.oanda.com${url(eurUsd)}",
-    headers = List(RawHeader("Authorization", "Bearer e5f024cbdd6458cfb0f1f196fe7b7295-1b5f5139c3b00e9b90a166c1cb1d4095"))))
+    headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
 
   val gbpUsdResponse = Http().singleRequest(HttpRequest(
     uri = s"https://stream-fxtrade.oanda.com${url(usdGbp)}",
-    headers = List(RawHeader("Authorization", "Bearer e5f024cbdd6458cfb0f1f196fe7b7295-1b5f5139c3b00e9b90a166c1cb1d4095"))))
+    headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
 
   for {
     eurUsd <- eurUsdResponse

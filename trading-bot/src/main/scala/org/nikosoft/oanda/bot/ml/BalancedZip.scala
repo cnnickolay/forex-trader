@@ -1,10 +1,6 @@
 package org.nikosoft.oanda.bot.ml
 
-import java.time.LocalDateTime
-
-import akka.actor.ActorSystem
 import akka.stream._
-import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 
 class BalancedZip[T](nextEnrichCondition: (T, T) => Boolean) extends GraphStage[FanInShape2[T, T, (T, T)]] {
@@ -35,7 +31,7 @@ class BalancedZip[T](nextEnrichCondition: (T, T) => Boolean) extends GraphStage[
           case (Some(_lastEnrich), _) => Option(_lastEnrich)
           case (None, _) => None
         }
-        enrichOption.fold(println("nothing to push"))(enrich => {
+        enrichOption.fold(pull(in1))(enrich => {
           val elem = (lastIncoming, enrich)
           push(out, elem)
         })
@@ -65,27 +61,4 @@ class BalancedZip[T](nextEnrichCondition: (T, T) => Boolean) extends GraphStage[
       }
     })
   }
-}
-
-object Main extends App {
-
-  implicit val actorSystem = ActorSystem("test")
-  implicit val actorMaterializer = ActorMaterializer()
-
-  val start = LocalDateTime.of(2010, 1, 1, 0, 0, 0)
-  val source1 = Source((0 until 30).map(start.plusDays(_)))
-  val source2 = Source((0 to 20 by 5).map(start.plusDays(_)))
-
-  RunnableGraph.fromGraph(GraphDSL.create() { implicit builder =>
-    import GraphDSL.Implicits._
-
-    val zip = builder.add(new BalancedZip[LocalDateTime]((main, enrich) => main.isAfter(enrich) || main.isEqual(enrich)))
-
-    source1 ~> zip.in0
-    source2 ~> zip.in1
-    zip.out ~> Sink.foreach(println)
-
-    ClosedShape
-  }).run()
-
 }

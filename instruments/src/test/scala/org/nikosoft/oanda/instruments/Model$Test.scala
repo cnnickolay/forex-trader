@@ -261,5 +261,5 @@ class Model$Test extends FunSpec with Matchers {
 
   def aCandleStick = CandleStick(Instant.now(), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), Random.nextInt(100), RandomUtils.nextLong(), complete = false)
 
-  def aChart[A](indicators: Seq[Indicator[Seq[CandleStick], A]] = Seq.empty) = new Chart(accountId = "123", instrument = "EUR_USD", granularity = M5, indicators = indicators)
+  def aChart[A](indicators: Seq[Indicator[Seq[CandleStick], A]] = Seq.empty) = new Chart(indicators = indicators)
 }

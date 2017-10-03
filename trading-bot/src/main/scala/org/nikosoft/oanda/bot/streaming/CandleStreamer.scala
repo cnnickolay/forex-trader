@@ -1,24 +1,27 @@
 package org.nikosoft.oanda.bot.streaming
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.stream.scaladsl.{Flow, Framing, GraphDSL, Merge, RunnableGraph, Sink}
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings, ClosedShape, Supervision}
+import akka.stream.scaladsl.{Framing, Sink, Source}
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
 import akka.util.ByteString
-import org.nikosoft.oanda.api.{Api, JsonSerializers}
+import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
+import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
-
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, RSICandleCloseIndicator, StochasticCandleIndicator}
 
 object CandleStreamer extends App {
 
   implicit val formats = JsonSerializers.formats
+
   import org.json4s.native.Serialization._
 
   val decider: Supervision.Decider = { e =>
@@ -27,27 +30,33 @@ object CandleStreamer extends App {
   }
 
   implicit val actorSystem = ActorSystem("streamer")
-  private val strategy = ActorMaterializerSettings(actorSystem).withSupervisionStrategy(decider)
+  val strategy = ActorMaterializerSettings(actorSystem).withSupervisionStrategy(decider)
   implicit val materializer = ActorMaterializer(strategy)
 
-  val accountId = AccountID("001-004-1442547-003")
+  val accountId = AccountID(GlobalProperties.TradingAccountId)
   val eurUsd = InstrumentName("EUR_USD")
   val usdGbp = InstrumentName("GBP_USD")
 
-  val gbpUsdResponseFuture = Http().singleRequest(HttpRequest(
-    uri = s"https://api-fxtrade.oanda.com/v3/instruments/${eurUsd.value}/candles?count=20",
-    headers = List(RawHeader("Authorization", "Bearer e5f024cbdd6458cfb0f1f196fe7b7295-1b5f5139c3b00e9b90a166c1cb1d4095"))))
+  val startDate = LocalDateTime.parse("2016-06-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
 
-  val response = Await.result(gbpUsdResponseFuture, Duration.Inf)
+  def url(from: LocalDateTime, to: LocalDateTime, granularity: String) = s"/v3/instruments/${eurUsd.value}/candles?from=${from.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
+    s"to=${to.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
+    s"granularity=$granularity&includeFirst=True"
 
-  val flow =
-    Framing.delimiter(ByteString("\n"), maximumFrameLength = 99999, allowTruncation = true)
-      .map(bs => bs.utf8String)
-      .map(read[CandlesResponse])
-      .mapConcat(_.candles.toList)
+  def source(chart: Chart, granularity: String): Source[CandleStick, NotUsed] =
+    Source(Stream.from(0)
+      .map(offset => url(startDate.plusDays(offset), startDate.plusDays(offset + 1), granularity))
+      .map(uri => HttpRequest(uri = uri, headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
+    )
+      .via(Http().outgoingConnectionHttps("api-fxtrade.oanda.com"))
+      .flatMapConcat(_.entity.dataBytes.via(
+        Framing.delimiter(ByteString("\n"), maximumFrameLength = 999999, allowTruncation = true)
+          .map(_.utf8String)
+          .map(read[CandlesResponse])
+          .mapConcat(_.candles.toList)))
+      .mapConcat(candle => candle.mid.map(CandleStick.toCandleStick(candle, _)).flatMap(chart.addCandleStick).toList)
 
-  response.entity.dataBytes
-    .via(flow)
-    .runWith(Sink.foreach(println))
+  source(new Chart(), "M30")
+    .runWith(Sink.foreach[CandleStick](println))
 
 }
