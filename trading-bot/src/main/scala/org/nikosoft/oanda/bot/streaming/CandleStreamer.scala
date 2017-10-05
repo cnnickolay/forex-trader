@@ -18,19 +18,22 @@ import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
 import org.nikosoft.oanda.instruments.Model.{ATRCandleIndicator, CMOCandleCloseIndicator, CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, RSICandleCloseIndicator, StochasticCandleIndicator}
+import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration.Inf
+import scala.math.BigDecimal.RoundingMode
+import scala.math.BigDecimal.RoundingMode.HALF_UP
 
 object CandleStreamer extends App {
 
   implicit val actorSystem = ActorSystem("streamer")
   implicit val materializer = ActorMaterializer()
 
-  val daysToStore = 30
+  val daysToStore = 60
 
   val startTime = LocalDateTime.now
-  storeData("S30")
+  storeData("M1")
   storeData("M5")
   storeData("M10")
   storeData("H1")
@@ -55,7 +58,7 @@ object CandleStreamer extends App {
 
     def source(chart: Chart, granularity: String): Source[CandleStick, NotUsed] =
       Source((0 until daysToStore)
-        .map(offset => url(startDate.plusDays(offset), startDate.plusDays(offset + 1), granularity))
+        .map(offset => url(startDate.plusDays(offset), startDate.plusDays(offset + 2), granularity))
         .map(uri => HttpRequest(uri = uri, headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
       )
         .via(Http().outgoingConnectionHttps("api-fxtrade.oanda.com"))
@@ -78,15 +81,25 @@ object CandleStreamer extends App {
       new MACDCandleCloseIndicator()
     )
 
+    def extractCsv(c: CandleStick) = {
+      val roundTo = 10
+      List(c.time, c.open, c.high, c.low, c.close, c.volume) ++ c.indicators.flatMap {
+        case (_, macd: MACDItem) => macd.histogram ++ macd.macd ++ Nil
+        case (_, value: Double) => value +: Nil
+        case (_, value: BigDecimal) => value +: Nil
+      }.map {
+        case value: Double => BigDecimal(value).setScale(roundTo, HALF_UP).toString
+        case value: BigDecimal => value.setScale(roundTo, HALF_UP).toString
+        case value => value.toString
+      }
+    }
+
     val exec = source(new Chart(indicators = indicators), cardinality)
       .via(Flow[CandleStick]
-        .map(c => CandleStick.unapply(c)
-          .map(_.productIterator)
-          .map(tuple => tuple.mkString(",") + '\n')
-          .map(ByteString(_))
-        )
+        .map(extractCsv)
+        .map(_.mkString(",") + '\n')
+        .map(ByteString(_))
       )
-      .mapConcat(s => s.toList)
       .toMat(sink)(Keep.right)
       .run()
 
