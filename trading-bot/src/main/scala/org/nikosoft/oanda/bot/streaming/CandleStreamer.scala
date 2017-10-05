@@ -1,7 +1,7 @@
 package org.nikosoft.oanda.bot.streaming
 
 import java.nio.file.Paths
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 import java.time.format.DateTimeFormatter
 
 import akka.NotUsed
@@ -27,10 +27,16 @@ object CandleStreamer extends App {
   implicit val actorSystem = ActorSystem("streamer")
   implicit val materializer = ActorMaterializer()
 
+  val daysToStore = 30
+
+  val startTime = LocalDateTime.now
   storeData("S30")
   storeData("M5")
   storeData("M10")
   storeData("H1")
+
+  val duration = Duration.between(LocalDateTime.now, startTime)
+  println(s"Process took $duration")
 
   Await.ready(actorSystem.terminate(), Inf)
 
@@ -39,9 +45,7 @@ object CandleStreamer extends App {
 
     import org.json4s.native.Serialization._
 
-    val accountId = AccountID(GlobalProperties.TradingAccountId)
     val eurUsd = InstrumentName("EUR_USD")
-    val usdGbp = InstrumentName("GBP_USD")
 
     val startDate = LocalDateTime.parse("2016-06-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
 
@@ -50,7 +54,7 @@ object CandleStreamer extends App {
       s"granularity=$granularity&includeFirst=True"
 
     def source(chart: Chart, granularity: String): Source[CandleStick, NotUsed] =
-      Source((0 to 5)
+      Source((0 until daysToStore)
         .map(offset => url(startDate.plusDays(offset), startDate.plusDays(offset + 1), granularity))
         .map(uri => HttpRequest(uri = uri, headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
       )
