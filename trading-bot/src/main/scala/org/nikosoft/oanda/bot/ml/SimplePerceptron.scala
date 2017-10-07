@@ -45,7 +45,7 @@ object SimplePerceptron extends App {
     .transform(augmentedDf)
     .drop("cmo21Raw")
 
-  val inputs = (0 to 10).map(_.toString).toArray
+  val inputs = (8 to 10).map(_.toString).toArray
   val featuresDf = new VectorAssembler().setInputCols(inputs).setOutputCol("features").transform(cmo21DF)
 
   featuresDf.show(20)
@@ -56,10 +56,10 @@ object SimplePerceptron extends App {
 
   val perceptron = new MultilayerPerceptronClassifier()
     .setLayers(layers)
-    .setTol(1E-6)
+//    .setTol(1E-6)
     .setBlockSize(128)
     .setSeed(1234L)
-    .setMaxIter(400)
+    .setMaxIter(100)
 
   val gbt = new GBTClassifier().setMaxIter(10).setMaxDepth(5)
 
