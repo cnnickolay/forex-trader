@@ -1,19 +1,18 @@
 package org.nikosoft.oanda.bot.streaming
 
 import java.nio.file.Paths
-import java.time.{Duration, LocalDateTime}
 import java.time.format.DateTimeFormatter
+import java.time.{Duration, LocalDateTime}
 
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.stream.scaladsl.{FileIO, Flow, Framing, Keep, Sink, Source}
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{FileIO, Flow, Framing, Keep, Source}
 import akka.util.ByteString
 import org.nikosoft.oanda.GlobalProperties
-import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
@@ -22,7 +21,6 @@ import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration.Inf
-import scala.math.BigDecimal.RoundingMode
 import scala.math.BigDecimal.RoundingMode.HALF_UP
 
 object CandleStreamer extends App {
@@ -30,13 +28,13 @@ object CandleStreamer extends App {
   implicit val actorSystem = ActorSystem("streamer")
   implicit val materializer = ActorMaterializer()
 
-  val daysToStore = 60
+  val daysToStore = 120
 
   val startTime = LocalDateTime.now
-  storeData("M1")
-  storeData("M5")
+//  storeData("M1")
+//  storeData("M5")
   storeData("M10")
-  storeData("H1")
+//  storeData("H1")
 
   val duration = Duration.between(LocalDateTime.now, startTime)
   println(s"Process took $duration")
@@ -47,18 +45,21 @@ object CandleStreamer extends App {
     implicit val formats = JsonSerializers.formats
 
     import org.json4s.native.Serialization._
-
     val eurUsd = InstrumentName("EUR_USD")
-
     val startDate = LocalDateTime.parse("2016-06-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
 
     def url(from: LocalDateTime, to: LocalDateTime, granularity: String) = s"/v3/instruments/${eurUsd.value}/candles?from=${from.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
       s"to=${to.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
       s"granularity=$granularity&includeFirst=True"
 
-    def source(chart: Chart, granularity: String): Source[CandleStick, NotUsed] =
-      Source((0 until daysToStore)
-        .map(offset => url(startDate.plusDays(offset), startDate.plusDays(offset + 2), granularity))
+    def source(chart: Chart, granularity: String): Source[CandleStick, NotUsed] = {
+      val range = 0 until daysToStore
+      Source((range, range.tail).zipped
+        .map { case (from, to) =>
+          val fromDate = startDate.plusDays(from)
+          val toDate = startDate.plusDays(to)
+          println(s"Pulling data from $fromDate to $toDate")
+          url(fromDate, toDate, granularity) }
         .map(uri => HttpRequest(uri = uri, headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
       )
         .via(Http().outgoingConnectionHttps("api-fxtrade.oanda.com"))
@@ -68,6 +69,7 @@ object CandleStreamer extends App {
             .map(read[CandlesResponse])
             .mapConcat(_.candles.toList)))
         .mapConcat(candle => candle.mid.map(CandleStick.toCandleStick(candle, _)).flatMap(chart.addCandleStick).toList)
+    }
 
     val sink = FileIO.toPath(Paths.get(s"target/eur_usd_$cardinality.csv"))
 

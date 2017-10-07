@@ -4,7 +4,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.nikosoft.oanda.bot.ml.Functions._
 
-object Entry extends App {
+object JoiningDataFrames extends App {
 
   val spark = SparkSession.builder().appName("MLProbe1").master("local[*]").getOrCreate()
 
