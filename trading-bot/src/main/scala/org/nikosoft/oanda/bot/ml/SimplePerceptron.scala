@@ -32,7 +32,7 @@ object SimplePerceptron extends App {
     .drop("m5Open", "m5High", "m5Low", "m5Close", "m5Volume")
 
   val augmentedDf = (0 to 11).foldLeft(m5DF)((df, idx) => df.withColumn(s"$idx", normalize(lead($"close", idx + 1).over(windowForLag) - lead($"close", idx).over(windowForLag))))
-    .withColumn("label", ($"11" > lit(0)).cast("integer"))
+    .withColumn("label", (lead($"close", 11).over(windowForLag) - lead($"close", 10).over(windowForLag) > lit(0)).cast("integer"))
     .drop("min", "close", "11")
     .sort(desc("m5RawDateTime"))
     .na.drop()
