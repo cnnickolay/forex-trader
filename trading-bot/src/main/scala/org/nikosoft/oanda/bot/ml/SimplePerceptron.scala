@@ -45,13 +45,14 @@ object SimplePerceptron extends App {
     .transform(augmentedDf)
     .drop("cmo21Raw")
 
-  val featuresDf = new VectorAssembler().setInputCols((0 to 10).map(_.toString).toArray :+ "cmo21").setOutputCol("features").transform(cmo21DF)
+  val inputs = (0 to 10).map(_.toString).toArray
+  val featuresDf = new VectorAssembler().setInputCols(inputs).setOutputCol("features").transform(cmo21DF)
 
   featuresDf.show(20)
 
-  val Array(train, test) = featuresDf.randomSplit(Array(0.6, 0.4), seed = 1234L)
+  val Array(train, test) = featuresDf.randomSplit(Array(0.6, 0.4))
 
-  val layers = Array[Int](12, 10, 5, 2)
+  val layers = Array[Int](inputs.length, inputs.length + 2, inputs.length + 2, 2)
 
   val perceptron = new MultilayerPerceptronClassifier()
     .setLayers(layers)
