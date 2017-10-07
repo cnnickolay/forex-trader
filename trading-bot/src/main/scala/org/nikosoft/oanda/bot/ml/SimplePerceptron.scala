@@ -45,7 +45,7 @@ object SimplePerceptron extends App {
     .transform(augmentedDf)
     .drop("cmo21Raw")
 
-  val inputs = (8 to 10).map(_.toString).toArray
+  val inputs = (9 to 10).map(_.toString).toArray
   val featuresDf = new VectorAssembler().setInputCols(inputs).setOutputCol("features").transform(cmo21DF)
 
   featuresDf.show(20)
