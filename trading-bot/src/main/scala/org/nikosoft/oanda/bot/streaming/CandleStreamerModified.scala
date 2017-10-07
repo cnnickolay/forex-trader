@@ -26,7 +26,7 @@ object CandleStreamerModified extends App {
 
   implicit val formats = JsonSerializers.formats
 
-  import org.json4s.native.Serialization._
+  import org.json4s.jackson.Serialization._
 
   val decider: Supervision.Decider = { e =>
     e.printStackTrace()

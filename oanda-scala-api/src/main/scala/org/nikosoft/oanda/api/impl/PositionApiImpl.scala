@@ -2,7 +2,7 @@ package org.nikosoft.oanda.api.impl
 
 import org.apache.http.client.fluent.Request
 import org.apache.http.entity.ContentType
-import org.json4s.native.Serialization._
+import org.json4s.jackson.Serialization._
 import org.nikosoft.oanda.api.ApiCommons
 import org.nikosoft.oanda.api.ApiModel.AccountModel.AccountID
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName

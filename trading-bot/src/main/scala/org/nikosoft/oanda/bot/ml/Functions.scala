@@ -25,4 +25,8 @@ object Functions {
     LocalDateTime.ofInstant(Instant.ofEpochMilli(offset), ZoneOffset.UTC).format(formatter)
   })
 
+  val normalize = udf[Int, Int](value => {
+    (value.toDouble / 10).toInt
+  })
+
 }

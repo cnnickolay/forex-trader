@@ -4,7 +4,7 @@ import java.util.Properties
 
 import org.apache.http.HttpResponse
 import org.apache.http.util.EntityUtils
-import org.json4s.native.Serialization._
+import org.json4s.jackson.Serialization._
 import org.nikosoft.oanda.api.Errors.{ApiErrorResponse, Error}
 
 import scala.util.{Failure, Success, Try}
