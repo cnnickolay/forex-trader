@@ -26,7 +26,7 @@ object Functions {
   })
 
   val normalize = udf[Int, Int](value => {
-    (value.toDouble / 10).toInt
+    (value.toDouble / 1).toInt
   })
 
 }

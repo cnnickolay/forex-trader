@@ -30,14 +30,14 @@ object CandleStreamer extends App {
   implicit val materializer = ActorMaterializer()
 
   val startDate = LocalDateTime.parse("2016-01-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
-  val endDate = LocalDateTime.parse("2017-01-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
+  val endDate = LocalDateTime.parse("2016-06-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
   val stepDays = 2
 
   val startTime = LocalDateTime.now
 //  storeData("M1")
   storeData("M5")
-//  storeData("M10")
-//  storeData("H1")
+  storeData("M10")
+  storeData("H1")
 
   val duration = Duration.between(LocalDateTime.now, startTime)
   println(s"Process took $duration")
@@ -91,10 +91,11 @@ object CandleStreamer extends App {
 
     val indicators = Seq(
 //      new RSICandleCloseIndicator(14),
+      new EMACandleCloseIndicator(21)
 //      new EMACandleCloseIndicator(50),
 //      new EMACandleCloseIndicator(100),
 //      new ATRCandleIndicator(14),
-      new CMOCandleCloseIndicator(21)
+//      new CMOCandleCloseIndicator(21)
 //      new StochasticCandleIndicator(5, Some(3), Some(3)),
 //      new MACDCandleCloseIndicator()
     )

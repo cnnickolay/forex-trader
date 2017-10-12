@@ -1,15 +1,15 @@
-package org.nikosoft.oanda.bot.ml
+package org.apache.spark.ml.classification.genetic
 
-import org.apache.spark.ml.classification.{GBTClassifier, MultilayerPerceptronClassificationModel, MultilayerPerceptronClassifier}
+import org.apache.spark.ml.classification.MultilayerPerceptronClassificationModel
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
-import org.apache.spark.ml.feature.{Bucketizer, StringIndexer, VectorAssembler}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.{desc, lead, lit, min}
 import org.apache.spark.sql.types.IntegerType
-import org.nikosoft.oanda.bot.ml.Functions._
 
-object SimplePerceptron extends App {
+object Trainer extends App {
 
   val spark = SparkSession.builder().appName("MLProbe1").master("local[*]").getOrCreate()
 
@@ -57,28 +57,25 @@ object SimplePerceptron extends App {
 
   val layers = Array[Int](inputs.length, inputs.length + 2, inputs.length + 2, 2)
 
-  val perceptron = new MultilayerPerceptronClassifier()
-    .setLayers(layers)
-    //    .setTol(1E-6)
-    .setBlockSize(128)
-    .setSeed(1234L)
-    .setMaxIter(100)
+  val rnd = new java.util.Random()
 
-  val model: MultilayerPerceptronClassificationModel = perceptron.fit(train)
+  def mutateShit() = {
+    val model: MultilayerPerceptronClassificationModel = new MultilayerPerceptronClassificationModel("123", layers, Vectors.dense((0 until 366).map(_ => rnd.nextDouble()).toArray))
+    println(model.weights.toArray.toList)
 
-  println(model.weights.size)
+    // compute accuracy on the test set
+    val result = model.transform(test)
+    val predictionAndLabels = result.select("prediction", "label")
 
-  // compute accuracy on the test set
-  val result = model.transform(test)
-  val predictionAndLabels = result.select("prediction", "label")
+    def evaluate(metric: String) = {
+      val evaluator = new MulticlassClassificationEvaluator().setMetricName(metric)
+      println(s"Test set $metric = " + evaluator.evaluate(predictionAndLabels))
+    }
 
-  def evaluate(metric: String) = {
-    val evaluator = new MulticlassClassificationEvaluator().setMetricName(metric)
-    println(s"Test set $metric = " + evaluator.evaluate(predictionAndLabels))
+    evaluate("f1")
   }
-
-  evaluate("accuracy")
-  evaluate("weightedPrecision")
-  evaluate("weightedRecall")
-  evaluate("f1")
+  (0 to 20).foreach { _ =>
+    println("---------------------")
+    mutateShit()
+  }
 }
