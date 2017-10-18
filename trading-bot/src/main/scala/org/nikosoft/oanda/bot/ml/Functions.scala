@@ -10,13 +10,6 @@ import org.apache.spark.sql.types._
 
 object Functions {
 
-/*
-  val timeConverterUdf = udf[LocalDateTime, String](rawTime => {
-    val formatter = DateTimeFormatter.ISO_DATE_TIME
-    LocalDateTime.parse(rawTime, formatter)
-  })
-*/
-
   val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
   val shrinkTimeUdf = udf[String, String, Integer]((dateTime, step) =>{
     val time = LocalDateTime.parse(dateTime, formatter)

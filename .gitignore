@@ -1,3 +1,7 @@
 **/.idea
 **/target
 **/api.properties
+model
+target
+*.csv
+data

@@ -16,28 +16,27 @@ import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
-import org.nikosoft.oanda.instruments.Model.{ATRCandleIndicator, CMOCandleCloseIndicator, CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, RSICandleCloseIndicator, StochasticCandleIndicator}
+import org.nikosoft.oanda.instruments.Model.{ATRCandleIndicator, CMOCandleCloseIndicator, CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, RSICandleCloseIndicator, SMACandleCloseIndicator, StochasticCandleIndicator}
 import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration.Inf
 import scala.math.BigDecimal.RoundingMode.HALF_UP
+import scala.util.Try
 
 object CandleStreamer extends App {
 
   implicit val actorSystem = ActorSystem("streamer")
   implicit val materializer = ActorMaterializer()
 
-  val startDate = LocalDateTime.parse("2016-01-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
-  val endDate = LocalDateTime.parse("2016-06-01T00:00:00Z", DateTimeFormatter.ISO_DATE_TIME)
   val stepDays = 2
 
   val startTime = LocalDateTime.now
-//  storeData("M1")
-  storeData("M5")
-  storeData("M10")
-  storeData("H1")
+  //  storeData("M1")
+  //  storeData("2016-01-01T00:00:00Z", "2016-01-05T00:00:00Z", "M5", "train")
+  storeData("2016-01-01T00:00:00Z", "2016-06-01T00:00:00Z", "M5", "train")
+  storeData("2016-06-01T00:00:00Z", "2016-08-01T00:00:00Z", "M5", "test")
 
   val duration = Duration.between(LocalDateTime.now, startTime)
   println(s"Process took $duration")
@@ -52,18 +51,18 @@ object CandleStreamer extends App {
     else fillInDates(nextDate, endDate, step, _allDates :+ nextDate)
   }
 
-  def storeData(cardinality: String) = {
+  def storeData(startDate: String, endDate: String, cardinality: String, filePrefix: String) = {
     implicit val formats = JsonSerializers.formats
 
     import org.json4s.jackson.Serialization._
     val eurUsd = InstrumentName("EUR_USD")
 
-    val dates = fillInDates(startDate, endDate, stepDays)
+    val dates = fillInDates(LocalDateTime.parse(startDate, DateTimeFormatter.ISO_DATE_TIME), LocalDateTime.parse(endDate, DateTimeFormatter.ISO_DATE_TIME), stepDays)
 
     def url(from: LocalDateTime, to: LocalDateTime, granularity: String) =
       s"/v3/instruments/${eurUsd.value}/candles?from=${from.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
-      s"to=${to.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
-      s"granularity=$granularity&includeFirst=True"
+        s"to=${to.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
+        s"granularity=$granularity&includeFirst=True"
 
     def source(chart: Chart, granularity: String): Source[CandleStick, NotUsed] = {
       val range = (dates, dates.tail).zipped
@@ -87,35 +86,37 @@ object CandleStreamer extends App {
         .mapConcat(candle => candle.mid.map(CandleStick.toCandleStick(candle, _)).flatMap(chart.addCandleStick).toList)
     }
 
-    val sink = FileIO.toPath(Paths.get(s"eur_usd_$cardinality.csv"))
+    val sink = FileIO.toPath(Paths.get(s"eur_usd_${filePrefix}_$cardinality.csv"))
 
     val indicators = Seq(
-//      new RSICandleCloseIndicator(14),
-      new EMACandleCloseIndicator(21)
-//      new EMACandleCloseIndicator(50),
-//      new EMACandleCloseIndicator(100),
-//      new ATRCandleIndicator(14),
-//      new CMOCandleCloseIndicator(21)
-//      new StochasticCandleIndicator(5, Some(3), Some(3)),
-//      new MACDCandleCloseIndicator()
+      new RSICandleCloseIndicator(14),
+      new SMACandleCloseIndicator(9),
+      new EMACandleCloseIndicator(21),
+      new EMACandleCloseIndicator(50),
+      //      new CMOCandleCloseIndicator(21)
+      new MACDCandleCloseIndicator()
+      //      new ATRCandleIndicator(14),
+      //      new StochasticCandleIndicator(5, Some(3), Some(3))
     )
 
-    def extractCsv(c: CandleStick) = {
-      val roundTo = 10
-      List(c.time, c.open, c.high, c.low, c.close, c.volume) ++ c.indicators.flatMap {
-        case (_, macd: MACDItem) => macd.histogram ++ macd.macd ++ Nil
-        case (_, value: Double) => value +: Nil
-        case (_, value: BigDecimal) => value +: Nil
-      }.map {
-        case value: Double => BigDecimal(value).setScale(roundTo, HALF_UP).toString
-        case value: BigDecimal => value.setScale(roundTo, HALF_UP).toString
-        case value => value.toString
-      }
-    }
+    val roundTo = 5
+
+    def extractCsv(c: CandleStick): List[List[String]] = Try {
+      val list: List[String] = (
+        List[BigDecimal](c.open, c.high, c.low, c.close, c.volume) ++
+        List[BigDecimal](
+          c.indicators("RSICandleCloseIndicator_14").asInstanceOf[BigDecimal],
+          c.indicators("SMACandleCloseIndicator_9").asInstanceOf[BigDecimal],
+          c.indicators("EMACandleCloseIndicator_21").asInstanceOf[BigDecimal],
+          c.indicators("EMACandleCloseIndicator_50").asInstanceOf[BigDecimal]
+        ) ++ c.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].histogram)
+        .map((value: BigDecimal) => value.setScale(roundTo, HALF_UP).toString)
+      List(c.time.toString) ++ list
+    }.toOption.toList
 
     val exec = source(new Chart(indicators = indicators), cardinality)
       .via(Flow[CandleStick]
-        .map(extractCsv)
+        .mapConcat(extractCsv)
         .map(_.mkString(",") + '\n')
         .map(ByteString(_))
       )
