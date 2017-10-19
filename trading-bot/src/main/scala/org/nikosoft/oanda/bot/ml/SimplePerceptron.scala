@@ -136,7 +136,7 @@ object SimplePerceptron extends App {
     else idx
   })
   val w = Window.orderBy(asc("dateTime"))
-  val commission = 10
+  val commission = 15
   val stopLossPips = 50
   val takeProfitPips = 50
   val profitUdf = udf ((macdValue: Int, close: mutable.WrappedArray[Double]) => {
@@ -151,6 +151,7 @@ object SimplePerceptron extends App {
       if (profit <= -stopLossPips || profit >= takeProfitPips) profit else next
     })
   })
+  private val macdTrendThreshold = 5
   val _df = df
     .withColumn("separator", nextIdUdf(lag($"macdHistogram", 1).over(w), $"macdHistogram"))
     .select("dateTime", "close", "macdHistogram", "separator")
@@ -159,10 +160,11 @@ object SimplePerceptron extends App {
     .withColumn("macdHistogram", $"macdHistogram"(1))
     .withColumn("profit", profitUdf($"macdHistogram", $"close"))
     .select("profit", "macdHistogram", "close")
-    .filter(($"macdHistogram" > 5) || ($"macdHistogram" < -5))
+    .filter(($"macdHistogram" > macdTrendThreshold) || ($"macdHistogram" < -macdTrendThreshold))
 
   _df.show(200, truncate = false)
 
+  _df.groupBy().count().show()
   _df.groupBy().sum("profit").show()
 
   //  df.filter(allPositivesUdf($"closeMinusEma50"))
