@@ -1,5 +1,6 @@
 package org.nikosoft.oanda.bot.scalping
 
+import java.nio.file.Paths
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, LocalDateTime}
 
@@ -9,13 +10,13 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Framing, Sink, Source}
+import akka.stream.scaladsl.{FileIO, Flow, Framing, Sink, Source}
 import akka.util.ByteString
 import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
-import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, MACDCandleCloseIndicator}
+import org.nikosoft.oanda.instruments.Model.{CMOCandleCloseIndicator, CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, RSICandleCloseIndicator}
 
 import scala.annotation.tailrec
 
@@ -57,7 +58,7 @@ object MainScalper extends App {
       s"to=${to.format(DateTimeFormatter.ISO_DATE_TIME) + "Z"}&" +
       s"granularity=$granularity&includeFirst=True"
 
-  def source(chart: Chart, granularity: String): Source[CandleStick, NotUsed] = {
+  def oandaSource(chart: Chart, granularity: String) = {
     val range = (dates, dates.tail).zipped
     Source(range
       .map { case (from, to) =>
@@ -79,15 +80,24 @@ object MainScalper extends App {
       .mapConcat(candle => candle.mid.map(CandleStick.toCandleStick(candle, _)).flatMap(chart.addCandleStick).toList)
   }
 
+  def csvSource(chart: Chart, file: String) = {
+    FileIO.fromPath(Paths.get(file))
+      .map(_.utf8String).map(read[CandlesResponse]).mapConcat(_.candles.toList)
+      .mapConcat(candle => candle.mid.map(CandleStick.toCandleStick(candle, _)).flatMap(chart.addCandleStick).toList)
+  }
+
   val indicators = Seq(
-    new MACDCandleCloseIndicator()
+    new MACDCandleCloseIndicator(),
+    new EMACandleCloseIndicator(20),
+    new EMACandleCloseIndicator(30),
+    new EMACandleCloseIndicator(50)
   )
 
   val roundTo = 5
 
   val trader = new Trader(commission = 15, takeProfit = 50, stopLoss = -50)
 
-  val exec = source(new Chart(indicators = indicators), cardinality)
+  val exec = oandaSource(new Chart(indicators = indicators), cardinality)
     .via(Flow[CandleStick].sliding(3, 1).mapConcat(candles => trader.processCandles(candles).toList))
     .runWith(Sink.foreach[Trade](trade => {
       println(s"${trader.stats}, profit from last trade: ${trade.profitPips}, duration ${trade.duration}, open at ${trade.openCandle.time}, closed at ${trade.closeCandle.time}")

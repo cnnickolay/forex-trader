@@ -11,6 +11,10 @@ object TraderModel {
 
   implicit class CandleStickPimped(candleStick: CandleStick) {
     def macdHistogramPips = (candleStick.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].histogram.getOrElse(BigDecimal(0)) * pipsCoef).toInt
+    def ema20 = candleStick.indicators.get("EMACandleCloseIndicator_20").map(_.asInstanceOf[BigDecimal].toDouble).getOrElse(0.0)
+    def ema30 = candleStick.indicators.get("EMACandleCloseIndicator_30").map(_.asInstanceOf[BigDecimal].toDouble).getOrElse(0.0)
+    def ema50 = candleStick.indicators.get("EMACandleCloseIndicator_50").map(_.asInstanceOf[BigDecimal].toDouble).getOrElse(0.0)
+    def cmo = candleStick.indicators.get("CMOCandleCloseIndicator_8").map(_.asInstanceOf[BigDecimal].toDouble).getOrElse(0.0)
   }
 
   abstract class OrderType
@@ -23,9 +27,11 @@ object TraderModel {
   }
 
   object Trade {
-    def calculateProfit(orderType: OrderType, current: CandleStick, openCandle: CandleStick, commission: Int) = {
-      if (orderType == LongOrderType) ((current.close - openCandle.close) * pipsCoef).toInt - commission
-      else if (orderType == ShortOrderType) ((openCandle.close - current.close) * pipsCoef).toInt - commission
+    def calculateProfit(orderType: OrderType, last: CandleStick, first: CandleStick, commission: Int) = {
+      val halfBuy = ((first.close - first.high).abs * pipsCoef / 2).toInt
+      val halfSell = ((last.close - first.low).abs * pipsCoef / 2).toInt
+      if (orderType == LongOrderType) ((last.close - first.close) * pipsCoef).toInt - commission - halfBuy
+      else if (orderType == ShortOrderType) (((last.close - first.close) * -1) * pipsCoef).toInt - commission + halfSell
       else 0
     }
   }
@@ -40,17 +46,15 @@ class Trader(val commission: Int = 10, val takeProfit: Int = 50, val stopLoss: I
   var trades: List[Trade] = List.empty
 
   def processCandles(candles: Seq[CandleStick]): Option[Trade] = (candles, openCandleOption, orderTypeOption) match {
-    case (_ +: _ +: current +: _, Some(openCandle), Some(orderType)) =>
+    case (_ :+ current, Some(openCandle), Some(orderType)) =>
       val profit: Int = Trade.calculateProfit(orderType, current, openCandle, commission)
       val trendChanged = (orderType == LongOrderType && current.macdHistogramPips < 0) || (orderType == ShortOrderType && current.macdHistogramPips > 0)
 
       if (profit >= takeProfit || profit <= stopLoss || trendChanged) closePosition(current) else None
-    case (list @ beforePrev +: prev +: current +: _, None, None) =>
-      if (beforePrev.macdHistogramPips < 0 && prev.macdHistogramPips > 0 && current.macdHistogramPips > 5) {
-        println(list.map(_.macdHistogramPips))
+    case (list @ _ :+ prev :+ current, None, None) =>
+      if (prev.macdHistogramPips < 0 && current.macdHistogramPips > 0) {
         openLongPosition(current)
-      } else if (beforePrev.macdHistogramPips > 0 && prev.macdHistogramPips < 0 && current.macdHistogramPips < -5) {
-        println(list.map(_.macdHistogramPips))
+      } else if (prev.macdHistogramPips > 0 && current.macdHistogramPips < 0) {
         openShortPosition(current)
       }
       None

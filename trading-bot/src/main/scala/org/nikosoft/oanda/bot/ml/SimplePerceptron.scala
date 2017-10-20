@@ -141,13 +141,13 @@ object SimplePerceptron extends App {
   val takeProfitPips = 50
   val profitUdf = udf ((macdValue: Int, close: mutable.WrappedArray[Double]) => {
     def profit(i: Int) = {
-      if (macdValue > 0) ((close(i) - close.head) * pipsCoef).toInt - commission
-      else if (macdValue < 0) ((close.head - close(i)) * pipsCoef).toInt - commission
+      if (macdValue > 0) ((close(i) - close(1)) * pipsCoef).toInt - commission
+      else if (macdValue < 0) ((close(1) - close(i)) * pipsCoef).toInt - commission
       else 0
     }
 
     val takeProfitAt = close.size - 1//if (close.size > 5) 5 else close.size - 1
-    (0 to takeProfitAt).map(profit).foldLeft(0)((profit, next) => {
+    (1 to takeProfitAt).map(profit).foldLeft(0)((profit, next) => {
       if (profit <= -stopLossPips || profit >= takeProfitPips) profit else next
     })
   })
