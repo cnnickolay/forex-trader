@@ -40,9 +40,9 @@ object MainScalper extends App {
     else fillInDates(nextDate, endDate, step, _allDates :+ nextDate)
   }
 
-  val startDate = "2017-01-01T00:00:00Z"
-  val endDate = "2017-06-01T00:00:00Z"
-  val cardinality = "H1"
+  val startDate = "2016-01-01T00:00:00Z"
+  val endDate = "2016-06-01T00:00:00Z"
+  val cardinality = "M5"
 
   implicit val formats = JsonSerializers.formats
 
@@ -88,9 +88,9 @@ object MainScalper extends App {
   val trader = new Trader(commission = 15, takeProfit = 50, stopLoss = -50)
 
   val exec = source(new Chart(indicators = indicators), cardinality)
-    .via(Flow[CandleStick].sliding(2, 1).mapConcat(candles => trader.processCandles(candles).toList))
+    .via(Flow[CandleStick].sliding(3, 1).mapConcat(candles => trader.processCandles(candles).toList))
     .runWith(Sink.foreach[Trade](trade => {
-      println(s"${trader.stats}, profit from last trade: ${trade.profitPips}, duration ${trade.duration}")
+      println(s"${trader.stats}, profit from last trade: ${trade.profitPips}, duration ${trade.duration}, open at ${trade.openCandle.time}, closed at ${trade.closeCandle.time}")
     }))
 
 }

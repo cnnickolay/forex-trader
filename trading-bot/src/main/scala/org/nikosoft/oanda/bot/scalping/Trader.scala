@@ -40,15 +40,17 @@ class Trader(val commission: Int = 10, val takeProfit: Int = 50, val stopLoss: I
   var trades: List[Trade] = List.empty
 
   def processCandles(candles: Seq[CandleStick]): Option[Trade] = (candles, openCandleOption, orderTypeOption) match {
-    case (_ +: current +: _, Some(openCandle), Some(orderType)) =>
+    case (_ +: _ +: current +: _, Some(openCandle), Some(orderType)) =>
       val profit: Int = Trade.calculateProfit(orderType, current, openCandle, commission)
       val trendChanged = (orderType == LongOrderType && current.macdHistogramPips < 0) || (orderType == ShortOrderType && current.macdHistogramPips > 0)
 
       if (profit >= takeProfit || profit <= stopLoss || trendChanged) closePosition(current) else None
-    case (prev +: current +: _, None, None) =>
-      if (prev.macdHistogramPips <= 0 && current.macdHistogramPips > 0 && current.macdHistogramPips >= 5) {
+    case (list @ beforePrev +: prev +: current +: _, None, None) =>
+      if (beforePrev.macdHistogramPips < 0 && prev.macdHistogramPips > 0 && current.macdHistogramPips > 5) {
+        println(list.map(_.macdHistogramPips))
         openLongPosition(current)
-      } else if (prev.macdHistogramPips >= 0 && current.macdHistogramPips < 0 && current.macdHistogramPips <= -5) {
+      } else if (beforePrev.macdHistogramPips > 0 && prev.macdHistogramPips < 0 && current.macdHistogramPips < -5) {
+        println(list.map(_.macdHistogramPips))
         openShortPosition(current)
       }
       None

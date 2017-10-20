@@ -155,14 +155,15 @@ object SimplePerceptron extends App {
   val _df = df
     .withColumn("separator", nextIdUdf(lag($"macdHistogram", 1).over(w), $"macdHistogram"))
     .select("dateTime", "close", "macdHistogram", "separator")
-    .groupBy("separator").agg(collect_list("macdHistogram").as("macdHistogram"), collect_list("close").as("close"))
-    .filter(size($"macdHistogram") > 1)
-    .withColumn("macdHistogram", $"macdHistogram"(1))
+    .groupBy("separator").agg(first("dateTime").as("dateTime"), collect_list("macdHistogram").as("macdHistogramArray"), collect_list("close").as("close"))
+    .filter(size($"macdHistogramArray") > 1)
+    .withColumn("macdHistogram", $"macdHistogramArray"(1))
     .withColumn("profit", profitUdf($"macdHistogram", $"close"))
-    .select("profit", "macdHistogram", "close")
+    .select("dateTime", "profit", "macdHistogram", "close", "macdHistogramArray")
     .filter(($"macdHistogram" > macdTrendThreshold) || ($"macdHistogram" < -macdTrendThreshold))
+    .orderBy(asc("dateTime"))
 
-  _df.show(200, truncate = false)
+  _df.show(20000, truncate = false)
 
   _df.groupBy().count().show()
   _df.groupBy().sum("profit").show()
