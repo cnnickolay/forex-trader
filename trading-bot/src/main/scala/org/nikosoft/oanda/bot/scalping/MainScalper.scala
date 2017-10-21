@@ -98,7 +98,7 @@ object MainScalper extends App {
   val trader = new Trader(commission = 15, takeProfit = 50, stopLoss = -50)
 
   val exec = oandaSource(new Chart(indicators = indicators), cardinality)
-    .via(Flow[CandleStick].sliding(3, 1).mapConcat(candles => trader.processCandles(candles).toList))
+    .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader.processCandles(candles).toList))
     .runWith(Sink.foreach[Trade](trade => {
       println(s"${trader.stats}, profit from last trade: ${trade.profitPips}, duration ${trade.duration}, open at ${trade.openCandle.time}, closed at ${trade.closeCandle.time}")
     }))
