@@ -68,7 +68,7 @@ object MainScalper extends App {
     )
       .via(Flow[(LocalDateTime, LocalDateTime, HttpRequest)]
         .map { case (from, to, request) =>
-//          println(s"Fetching from $from to $to")
+          //          println(s"Fetching from $from to $to")
           request
         })
       .via(Http().outgoingConnectionHttps("api-fxtrade.oanda.com"))
@@ -82,8 +82,13 @@ object MainScalper extends App {
 
   def csvSource(chart: Chart, file: String) = {
     FileIO.fromPath(Paths.get(file))
-      .map(_.utf8String).map(read[CandlesResponse]).mapConcat(_.candles.toList)
-      .mapConcat(candle => candle.mid.map(CandleStick.toCandleStick(candle, _)).flatMap(chart.addCandleStick).toList)
+      .via(
+        Framing.delimiter(ByteString("\n"), maximumFrameLength = 999999, allowTruncation = true)
+          .map(_.utf8String)
+          .map(read[CandlesResponse])
+          .mapConcat(_.candles.toList)
+          .mapConcat(candle => candle.mid.map(CandleStick.toCandleStick(candle, _)).flatMap(chart.addCandleStick).toList)
+      )
   }
 
   val indicators = Seq(
@@ -95,12 +100,16 @@ object MainScalper extends App {
 
   val roundTo = 5
 
-  val trader = new Trader(commission = 15, takeProfit = 50, stopLoss = -50)
+  val trader = new Trader(commission = 0, openOrderOffset = 45, takeProfit = 50, stopLoss = 50)
 
-  val exec = oandaSource(new Chart(indicators = indicators), cardinality)
+  val exec = csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_M5.csv")
     .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader.processCandles(candles).toList))
-    .runWith(Sink.foreach[Trade](trade => {
-      println(s"${trader.stats}, profit from last trade: ${trade.profitPips}, duration ${trade.duration}, open at ${trade.openCandle.time}, closed at ${trade.closeCandle.time}")
-    }))
+    .runWith(Sink.foreach[Order] {
+      //      case order if order.orderState == PendingOrder => println(s"Order type ${order.orderType}, buy at ${order.buyAt}, current close price ${order.createdAtCandle.close},  created at ${order.createdAtCandle.time}, take profit ${order.takeProfit}, stop loss ${order.stopLoss}")
+      case order@Order(_, _, _, _, _, createdAt, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | CancelledOrder)) =>
+        println(trader.stats)
+        println(s"State $orderState, type ${order.orderType}, profit: ${order.profitPips}, duration ${order.duration}, open price ${order.openAtPrice}, stop loss ${order.stopLoss}, take profit ${order.takeProfit}, close price $closedAtPrice, open at ${boughtAt.time}, closed at ${closedAt.time}")
+      case _ =>
+    })
 
 }
