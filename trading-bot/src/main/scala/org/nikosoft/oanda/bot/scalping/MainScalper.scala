@@ -16,9 +16,12 @@ import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
+import org.nikosoft.oanda.bot.streaming.InvestingComStreamer.actorSystem
 import org.nikosoft.oanda.instruments.Model.{CMOCandleCloseIndicator, CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, RSICandleCloseIndicator}
 
 import scala.annotation.tailrec
+import scala.concurrent.duration.Duration.Inf
+import scala.concurrent.{Await, duration}
 
 object MainScalper extends App {
 
@@ -100,16 +103,18 @@ object MainScalper extends App {
 
   val roundTo = 5
 
-  val trader = new Trader(commission = 0, openOrderOffset = 45, takeProfit = 50, stopLoss = 50)
+  val trader = new Trader(commission = 10, openOrderOffset = 0, takeProfit = 40, stopLoss = 40)
 
-  val exec = csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_M5.csv")
+  val exec = csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2017_M5.csv")
     .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader.processCandles(candles).toList))
     .runWith(Sink.foreach[Order] {
-      //      case order if order.orderState == PendingOrder => println(s"Order type ${order.orderType}, buy at ${order.buyAt}, current close price ${order.createdAtCandle.close},  created at ${order.createdAtCandle.time}, take profit ${order.takeProfit}, stop loss ${order.stopLoss}")
-      case order@Order(_, _, _, _, _, createdAt, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | CancelledOrder)) =>
-        println(trader.stats)
+      case order if order.orderState == PendingOrder => println(s"Opening ${order.orderType}, buy at ${order.openAtPrice}, current close price ${order.createdAtCandle.close},  created at ${order.createdAtCandle.time}, take profit ${order.takeProfit}, stop loss ${order.stopLoss}")
+      case order@Order(_, _, _, _, _, _, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | CancelledOrder)) =>
         println(s"State $orderState, type ${order.orderType}, profit: ${order.profitPips}, duration ${order.duration}, open price ${order.openAtPrice}, stop loss ${order.stopLoss}, take profit ${order.takeProfit}, close price $closedAtPrice, open at ${boughtAt.time}, closed at ${closedAt.time}")
+        println(">> " + trader.stats)
       case _ =>
     })
 
+  Await.ready(exec, Inf)
+  Await.ready(actorSystem.terminate(), Inf)
 }

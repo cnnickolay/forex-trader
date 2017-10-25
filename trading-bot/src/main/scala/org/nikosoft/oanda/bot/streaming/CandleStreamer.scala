@@ -35,7 +35,7 @@ object CandleStreamer extends App {
   val startTime = LocalDateTime.now
   //  storeData("M1")
 //    storeData("2016-01-01T00:00:00Z", "2016-01-05T00:00:00Z", "M5", "train")
-  storeData("2016-01-01T00:00:00Z", "2016-03-01T00:00:00Z", "M5", "raw")
+  storeData("2017-01-01T00:00:00Z", "2018-01-01T00:00:00Z", "M5", "train_2017")
 //  storeData("2016-06-01T00:00:00Z", "2016-08-01T00:00:00Z", "M5", "test")
 
   val duration = Duration.between(LocalDateTime.now, startTime)
@@ -89,10 +89,10 @@ object CandleStreamer extends App {
     val sink = FileIO.toPath(Paths.get(s"eur_usd_${filePrefix}_$cardinality.csv"))
 
     val indicators = Seq(
-      new RSICandleCloseIndicator(14),
-      new SMACandleCloseIndicator(9),
-      new EMACandleCloseIndicator(21),
-      new EMACandleCloseIndicator(50),
+//      new RSICandleCloseIndicator(14),
+//      new SMACandleCloseIndicator(9),
+//      new EMACandleCloseIndicator(21),
+//      new EMACandleCloseIndicator(50),
       //      new CMOCandleCloseIndicator(21)
       new MACDCandleCloseIndicator()
       //      new ATRCandleIndicator(14),
@@ -104,11 +104,15 @@ object CandleStreamer extends App {
     def extractCsv(c: CandleStick): List[List[String]] = Try {
       val list: List[String] = (
         List[BigDecimal](c.open, c.high, c.low, c.close, c.volume) ++
-        List[BigDecimal](c.indicators("RSICandleCloseIndicator_14").asInstanceOf[BigDecimal],
+        /*List[BigDecimal](
+          c.indicators("RSICandleCloseIndicator_14").asInstanceOf[BigDecimal],
           c.indicators("SMACandleCloseIndicator_9").asInstanceOf[BigDecimal],
           c.indicators("EMACandleCloseIndicator_21").asInstanceOf[BigDecimal],
           c.indicators("EMACandleCloseIndicator_50").asInstanceOf[BigDecimal]
-        ) ++ c.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].histogram)
+        ) ++ */
+          c.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].signalLine ++
+          c.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].macd ++
+          c.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].histogram)
         .map((value: BigDecimal) => value.setScale(roundTo, HALF_UP).toString)
       List(c.time.toString) ++ list
     }.toOption.toList
