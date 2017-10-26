@@ -16,6 +16,7 @@ object InvestingComStreamer extends App {
 
   val anchors = List("RSI(14)", "STOCH(9,6)", "STOCHRSI(14)", "MACD(12,26)", "ADX(14)", "Williams %R", "CCI(14)", "ATR(14)", "Highs/Lows(14)", "Ultimate Oscillator", "ROC", "Bull/Bear Power(13)")
   val averages = List("MA200", "MA100", "MA50", "MA20", "MA10", "MA5")
+  val pivots = List("Classic", "Fibonacci", "Camarilla", "Woodie's", "DeMark's")
 
   Source.tick(0.minutes, 5.seconds, "tick")
     .map(_ => HttpRequest(uri = "/instruments/Service/GetTechincalData",
@@ -34,7 +35,9 @@ object InvestingComStreamer extends App {
     .map { page =>
       val extractor = """.*>(.+?)<.*""".r
       val extractOverall = """.*(Neutral|Sell|Buy)\:.*>(\d+)<.*""".r
+      val extractSummary = """\s+Summary.*>(.*?)<.*""".r
       val extractAverage = """\s+(\w+)\s+.*""".r
+      val extractNumber = """.*>(\d+\.\d+)<.*""".r
       page.split("\n").toList.sliding(15)
         .foldLeft(List.empty[(String, Any)])((result, lines) => {
           val anchor = anchors.find(lines.head.contains).map(found => {
@@ -49,8 +52,15 @@ object InvestingComStreamer extends App {
             val extractAverage(advise) = lines(9)
             s"${found}_exponential" -> advise
           })
-          val summary = if (lines.last.contains("Summary:")) Map((if (!result.exists(_._1 == "summary_technical")) "summary_technical" else "summary_averages") -> lines.collect { case extractOverall(sentiment, votes) => (sentiment, votes) }.toMap) else Map.empty[String, Any]
-          result ++ anchor ++ summary ++ averageSimple ++ averageExponential
+          val pivotPoints = pivots.find(lines.head.contains).map(found => {
+            found -> lines.tail.take(7).collect { case extractNumber(number) => number.toDouble }
+          })
+          val summary = if (lines.last.contains("Summary:"))
+            Map((if (!result.exists(_._1 == "summary_technical")) "summary_technical" else "summary_averages") -> {
+              val extractSummary(summary) = lines.last
+          ("Summary" -> summary) +: lines.collect { case extractOverall(sentiment, votes) => sentiment -> votes }}
+            ) else Map.empty[String, Any]
+          result ++ anchor ++ summary ++ averageSimple ++ averageExponential ++ pivotPoints
         })
     }
     .runWith(Sink.foreach(_.foreach(println)))
