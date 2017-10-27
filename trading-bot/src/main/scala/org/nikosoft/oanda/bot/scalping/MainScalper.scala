@@ -1,10 +1,9 @@
 package org.nikosoft.oanda.bot.scalping
 
 import java.nio.file.Paths
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.time.{Duration, LocalDateTime}
 
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
@@ -16,12 +15,11 @@ import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
-import org.nikosoft.oanda.bot.streaming.InvestingComStreamer.actorSystem
-import org.nikosoft.oanda.instruments.Model.{CMOCandleCloseIndicator, CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, RSICandleCloseIndicator}
+import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator}
 
 import scala.annotation.tailrec
+import scala.concurrent.Await
 import scala.concurrent.duration.Duration.Inf
-import scala.concurrent.{Await, duration}
 
 object MainScalper extends App {
 
