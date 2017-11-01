@@ -93,29 +93,57 @@ object MainScalper extends App {
   }
 
   val indicators = Seq(
-    new MACDCandleCloseIndicator(),
-    new SMACandleCloseIndicator(168),
+    //    new MACDCandleCloseIndicator(),
+    new SMACandleCloseIndicator(168) /*,
     new EMACandleCloseIndicator(20),
     new EMACandleCloseIndicator(30),
     new EMACandleCloseIndicator(40),
     new EMACandleCloseIndicator(50),
-    new EMACandleCloseIndicator(100)
+    new EMACandleCloseIndicator(100)*/
   )
 
-  val roundTo = 5
+/*
+  val printAllSink = Sink.foreach[Order] {
+    case order@Order(_, _, _, _, _, _, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | CancelledOrder)) =>
+      println(s"State $orderState, type ${order.orderType}, profit: ${order.profitPips}, duration ${order.duration}, open price ${order.openAtPrice}, stop loss ${order.stopLoss}, take profit ${order.takeProfit}, close price $closedAtPrice, open at ${boughtAt.time}, closed at ${closedAt.time}")
+      println(">> " + trader.stats)
+    case _ =>
+  }
+*/
+  case class TraderParams(minTakeProfit: Int, stopTradingAfterHours: Int)
 
-  val trader = new Trader(commission = 10, openOrderOffset = 20, minTakeProfit = 200, stopLoss = 50)
+  val params = for {
+    minTakeProfit <- List(100, 150, 200)
+    stopTradingAfterHours <- (8 to 40 by 4).toList
+  } yield TraderParams(minTakeProfit, stopTradingAfterHours)
 
-  val exec = csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2017_H1.csv")
-    .via(Flow[CandleStick]/*.filter(candle => candle.time.toDateTime.getHourOfDay >= 6 && candle.time.toDateTime.getHourOfDay < 14)*/.sliding(4, 1).mapConcat(candles => trader.processCandles(candles).toList))
-    .runWith(Sink.foreach[Order] {
-//      case order if order.orderState == PendingOrder => println(s"Opening ${order.orderType}, buy at ${order.openAtPrice}, current close price ${order.createdAtCandle.close},  created at ${order.createdAtCandle.time}, take profit ${order.takeProfit}, stop loss ${order.stopLoss}")
-      case order@Order(_, _, _, _, _, _, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | CancelledOrder)) =>
-        println(s"State $orderState, type ${order.orderType}, profit: ${order.profitPips}, duration ${order.duration}, open price ${order.openAtPrice}, stop loss ${order.stopLoss}, take profit ${order.takeProfit}, close price $closedAtPrice, open at ${boughtAt.time}, closed at ${closedAt.time}")
-        println(">> " + trader.stats)
-      case _ =>
-    })
+  params.par.foreach(param => {
+    val trader2015 = new Trader(commission = 15, openOrderOffset = 20, minTakeProfit = param.minTakeProfit, stopLoss = 5, stopTradingAfterHours = param.stopTradingAfterHours)
+    Await.ready(
+      csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2015_H1.csv")
+        .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader2015.processCandles(candles).toList))
+        .runWith(Sink.ignore), Inf)
 
-  Await.ready(exec, Inf)
+    val trader2016 = new Trader(commission = 15, openOrderOffset = 20, minTakeProfit = param.minTakeProfit, stopLoss = 5, stopTradingAfterHours = param.stopTradingAfterHours)
+    Await.ready(
+      csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2016_H1.csv")
+        .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader2016.processCandles(candles).toList))
+        .runWith(Sink.ignore), Inf)
+
+    val trader2017 = new Trader(commission = 15, openOrderOffset = 20, minTakeProfit = param.minTakeProfit, stopLoss = 5, stopTradingAfterHours = param.stopTradingAfterHours)
+    Await.ready(
+      csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2017_H1.csv")
+        .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader2017.processCandles(candles).toList))
+        .runWith(Sink.ignore), Inf)
+
+//    (param, trader2015.stats, trader2016.stats, trader2017.stats)
+    println(
+      s"""$param
+         |${trader2015.stats}
+         |${trader2016.stats}
+         |${trader2017.stats}
+         |-------------------""".stripMargin)
+  })
+
   Await.ready(actorSystem.terminate(), Inf)
 }

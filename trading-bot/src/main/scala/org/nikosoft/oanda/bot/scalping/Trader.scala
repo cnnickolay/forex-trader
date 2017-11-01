@@ -63,101 +63,60 @@ object TraderModel {
   }
 }
 
-class Trader(val commission: Int = 10, val openOrderOffset: Int = 45, val takeProfit: Int = 200, val stopLoss: Int = 50, val minTakeProfit: Int = 200) {
+class Trader(val commission: Int = 10, val openOrderOffset: Int = 45, val takeProfit: Int = 200, val stopLoss: Int = 50, val minTakeProfit: Int = 200, val stopTradingAfterHours: Int = 24) {
 
   import TraderModel._
 
   var currentOrderOption: Option[Order] = None
   var orders: List[Order] = List.empty
 
-  def processCandles(candles: Seq[CandleStick]): Option[Order] = (candles, currentOrderOption) match {
-    case (_ :+ pprev :+ prev :+ current, None) => // order creation
-//      if (current.ema20 > current.ema30 && prev.ema20 < prev.ema30 && current.close < current.ema30) {
-//        currentOrderOption = Some(Order(LongOrderType, commission, Some(current.close - openOrderOffset.toRate), takeProfit, stopLoss, current))
-//      }
-      val takeProfit = (current.close - current.sma("168")).toPips
-      if (takeProfit.abs >= minTakeProfit) currentOrderOption = Some(Order(if (takeProfit < 0) LongOrderType else ShortOrderType, commission, None, takeProfit.abs, stopLoss, current))
-      currentOrderOption
-    case (_ :+ previous :+ current, Some(pendingOrder)) if pendingOrder.orderState == PendingOrder => // order execution attempt
-      if (pendingOrder.openAtPrice.isEmpty) {
-        currentOrderOption = Some(pendingOrder.copy(orderState = ExecutedOrder, boughtAtCandle = Some(current), openAtPrice = Some(current.open)))
-      } else if ((pendingOrder.orderType == LongOrderType && ~pendingOrder.openAtPrice >= current.low) || (pendingOrder.orderType == ShortOrderType && ~pendingOrder.openAtPrice <= current.high)) {
-        currentOrderOption = Some(pendingOrder.copy(orderState = ExecutedOrder, boughtAtCandle = Some(current)))
-      } else currentOrderOption = None
-      currentOrderOption
-    case (_ :+ current, Some(order)) if order.orderState == ExecutedOrder =>
-      val takeProfitRate = ~order.openAtPrice + order.takeProfit.toRate * (if (order.orderType == ShortOrderType) -1 else 1)
-      val stopLossRate = ~order.openAtPrice + order.stopLoss.toRate * (if (order.orderType == ShortOrderType) 1 else -1)
-
-      val (lowest, highest) = if (current.close > current.open) (current.open, current.close) else (current.close, current.open)
-
-      if ((order.orderType == LongOrderType && stopLossRate >= lowest) ||
-        (order.orderType == ShortOrderType && stopLossRate <= highest)) {
-        orders = order.copy(orderState = StopLossOrder, closedAtPrice = stopLossRate, closedAtCandle = Some(current)) +: orders
-        currentOrderOption = None
-        orders.headOption
-      } else if ((order.orderType == LongOrderType && takeProfitRate <= current.high) || (order.orderType == ShortOrderType && takeProfitRate >= current.low)) {
-        orders = order.copy(orderState = TakeProfitOrder, closedAtPrice = takeProfitRate, closedAtCandle = Some(current)) +: orders
-        currentOrderOption = None
-        orders.headOption
-      } else if (order.boughtAtCandle.exists(boughtAt => new Duration(boughtAt.time, current.time).toStandardDays.getDays >= 1)) {
-        orders = order.copy(orderState = StopLossOrder, closedAtPrice = current.close, closedAtCandle = Some(current)) +: orders
-        currentOrderOption = None
-        orders.headOption
-      } else None
-  }
-
-/*
-  def processCandles(candles: Seq[CandleStick]): Option[Order] = (candles, currentOrderOption) match {
-    case (_ :+ pprev :+ prev :+ current, None) => // order creation
-      if (prev.macdHistogram < 0 && current.macdHistogram > 0) {
-        val buyAt = prev.close + (pprev.close - prev.close) - openOrderOffset.toRate
-        currentOrderOption = Some(Order(LongOrderType, commission, None, takeProfit, stopLoss, current))
+  def processCandles(candles: Seq[CandleStick]): Option[Order] = {
+    (candles, currentOrderOption) match {
+      case (_ :+ pprev :+ prev :+ current, None) => // order creation
+        //      if (current.ema20 > current.ema30 && prev.ema20 < prev.ema30 && current.close < current.ema30) {
+        //        currentOrderOption = Some(Order(LongOrderType, commission, Some(current.close - openOrderOffset.toRate), takeProfit, stopLoss, current))
+        //      }
+        val takeProfit = (current.close - current.sma("168")).toPips
+        if (takeProfit.abs >= minTakeProfit) currentOrderOption = Some(Order(if (takeProfit < 0) LongOrderType else ShortOrderType, commission, None, takeProfit.abs, stopLoss, current))
         currentOrderOption
-      } else if (prev.macdHistogram > 0 && current.macdHistogram < 0) {
-        val buyAt = prev.close + (pprev.close - prev.close) + openOrderOffset.toRate
-        currentOrderOption = Some(Order(ShortOrderType, commission, None, takeProfit, stopLoss, current))
+      case (_ :+ previous :+ current, Some(pendingOrder)) if pendingOrder.orderState == PendingOrder => // order execution attempt
+        if (pendingOrder.openAtPrice.isEmpty) {
+          currentOrderOption = Some(pendingOrder.copy(orderState = ExecutedOrder, boughtAtCandle = Some(current), openAtPrice = Some(current.open)))
+        } else if ((pendingOrder.orderType == LongOrderType && ~pendingOrder.openAtPrice >= current.low) || (pendingOrder.orderType == ShortOrderType && ~pendingOrder.openAtPrice <= current.high)) {
+          currentOrderOption = Some(pendingOrder.copy(orderState = ExecutedOrder, boughtAtCandle = Some(current)))
+        } else currentOrderOption = None
         currentOrderOption
-      } else None
-    case (_ :+ previous :+ current, Some(pendingOrder)) if pendingOrder.orderState == PendingOrder => // order execution attempt
-      if (pendingOrder.openAtPrice.isEmpty) {
-        currentOrderOption = Some(pendingOrder.copy(orderState = ExecutedOrder, boughtAtCandle = Some(current), openAtPrice = Some(current.open)))
-      } else if ((pendingOrder.orderType == LongOrderType && ~pendingOrder.openAtPrice >= current.low) || (pendingOrder.orderType == ShortOrderType && ~pendingOrder.openAtPrice <= current.high)) {
-        currentOrderOption = Some(pendingOrder.copy(orderState = ExecutedOrder, boughtAtCandle = Some(current)))
-      } else if ((pendingOrder.orderType == LongOrderType && previous.macdHistogram > current.macdHistogram) || (pendingOrder.orderType == ShortOrderType && previous.macdHistogram < current.macdHistogram)) {
-        currentOrderOption = None
-      }// else currentOrderOption = None
-      None
-    case (_ :+ current, Some(order)) if order.orderState == ExecutedOrder =>
-      val takeProfitRate = ~order.openAtPrice + order.takeProfit.toRate * (if (order.orderType == ShortOrderType) -1 else 1)
-      val stopLossRate = ~order.openAtPrice + order.stopLoss.toRate * (if (order.orderType == ShortOrderType) 1 else -1)
+      case (_ :+ current, Some(order)) if order.orderState == ExecutedOrder =>
+        val takeProfitRate = ~order.openAtPrice + order.takeProfit.toRate * (if (order.orderType == ShortOrderType) -1 else 1)
+        val stopLossRate = ~order.openAtPrice + order.stopLoss.toRate * (if (order.orderType == ShortOrderType) 1 else -1)
 
-      val (lowest, highest) = if (current.close > current.open) (current.open, current.close) else (current.close, current.open)
+        val (lowest, highest) = if (current.close > current.open) (current.open, current.close) else (current.close, current.open)
 
-      if ((order.orderType == LongOrderType && stopLossRate >= lowest) ||
-        (order.orderType == ShortOrderType && stopLossRate <= highest)) {
-        orders = order.copy(orderState = StopLossOrder, closedAtPrice = (order.orderType == LongOrderType) ? lowest | highest, closedAtCandle = Some(current)) +: orders
-        currentOrderOption = None
-        orders.headOption
-      } else if ((order.orderType == LongOrderType && takeProfitRate <= current.high) || (order.orderType == ShortOrderType && takeProfitRate >= current.low)) {
-        orders = order.copy(orderState = TakeProfitOrder, closedAtPrice = takeProfitRate, closedAtCandle = Some(current)) +: orders
-        currentOrderOption = None
-        orders.headOption
-      } else if ((order.orderType == LongOrderType && current.macdHistogramPips < 0) || (order.orderType == ShortOrderType && current.macdHistogramPips > 0)) {
-        orders = order.copy(orderState = CancelledOrder, closedAtPrice = current.close, closedAtCandle = Some(current)) +: orders
-        currentOrderOption = None
-        orders.headOption
-      }
-      else None
+        if ((order.orderType == LongOrderType && stopLossRate >= lowest) ||
+          (order.orderType == ShortOrderType && stopLossRate <= highest)) {
+          orders = order.copy(orderState = StopLossOrder, closedAtPrice = stopLossRate, closedAtCandle = Some(current)) +: orders
+          currentOrderOption = None
+          orders.headOption
+        } else if ((order.orderType == LongOrderType && takeProfitRate <= current.high) || (order.orderType == ShortOrderType && takeProfitRate >= current.low)) {
+          orders = order.copy(orderState = TakeProfitOrder, closedAtPrice = takeProfitRate, closedAtCandle = Some(current)) +: orders
+          currentOrderOption = None
+          orders.headOption
+        } else if (order.boughtAtCandle.exists(boughtAt => new Duration(boughtAt.time, current.time).getStandardHours >= stopTradingAfterHours)) {
+          orders = order.copy(orderState = StopLossOrder, closedAtPrice = current.close, closedAtCandle = Some(current)) +: orders
+          currentOrderOption = None
+          orders.headOption
+        } else None
+    }
   }
-*/
 
   def stats: String = {
     val profitList = orders.map(_.profitPips)
     val positives = profitList.count(_ > 0)
+    val totalPositives = profitList.filter(_ > 0).sum
     val negatives = profitList.count(_ < 0)
+    val totalNegatives = profitList.filter(_ < 0).sum
     val profit = profitList.sum
-    s"Total trades done ${orders.size}, total profit: $profit, positives: $positives, negatives: $negatives"
+    s"Total trades done ${orders.size}, total profit: $profit, positives: $positives ($totalPositives), negatives: $negatives ($totalNegatives)"
   }
 
 }
