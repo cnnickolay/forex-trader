@@ -52,7 +52,7 @@ object TraderModel {
     }).toPips - commissionPips
 
     def duration = (boughtAtCandle |@| closedAtCandle) { (b, c) =>
-      new Duration(b.time, c.time).toStandardMinutes.toString
+      new Duration(b.time, c.time).toStandardHours.toString
     }.getOrElse("")
   }
 
@@ -63,7 +63,7 @@ object TraderModel {
   }
 }
 
-class Trader(val commission: Int = 10, val openOrderOffset: Int = 45, val takeProfit: Int = 50, val stopLoss: Int = 50) {
+class Trader(val commission: Int = 10, val openOrderOffset: Int = 45, val takeProfit: Int = 200, val stopLoss: Int = 50, val minTakeProfit: Int = 200) {
 
   import TraderModel._
 
@@ -76,7 +76,7 @@ class Trader(val commission: Int = 10, val openOrderOffset: Int = 45, val takePr
 //        currentOrderOption = Some(Order(LongOrderType, commission, Some(current.close - openOrderOffset.toRate), takeProfit, stopLoss, current))
 //      }
       val takeProfit = (current.close - current.sma("168")).toPips
-      currentOrderOption = Some(Order(if (takeProfit < 0) LongOrderType else ShortOrderType, commission, None, takeProfit.abs, stopLoss, current))
+      if (takeProfit.abs >= minTakeProfit) currentOrderOption = Some(Order(if (takeProfit < 0) LongOrderType else ShortOrderType, commission, None, takeProfit.abs, stopLoss, current))
       currentOrderOption
     case (_ :+ previous :+ current, Some(pendingOrder)) if pendingOrder.orderState == PendingOrder => // order execution attempt
       if (pendingOrder.openAtPrice.isEmpty) {
@@ -100,7 +100,7 @@ class Trader(val commission: Int = 10, val openOrderOffset: Int = 45, val takePr
         orders = order.copy(orderState = TakeProfitOrder, closedAtPrice = takeProfitRate, closedAtCandle = Some(current)) +: orders
         currentOrderOption = None
         orders.headOption
-      } else if (order.boughtAtCandle.exists(boughtAt => new Duration(boughtAt.time, current.time).toStandardDays.getDays >= 7)) {
+      } else if (order.boughtAtCandle.exists(boughtAt => new Duration(boughtAt.time, current.time).toStandardDays.getDays >= 1)) {
         orders = order.copy(orderState = StopLossOrder, closedAtPrice = current.close, closedAtCandle = Some(current)) +: orders
         currentOrderOption = None
         orders.headOption
