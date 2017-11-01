@@ -35,7 +35,7 @@ object CandleStreamer extends App {
   val startTime = LocalDateTime.now
   //  storeData("M1")
 //    storeData("2016-01-01T00:00:00Z", "2016-01-05T00:00:00Z", "M5", "train")
-  storeData("2017-01-01T00:00:00Z", "2018-01-01T00:00:00Z", "M5", "train_2017")
+  storeData("2017-10-23T06:00:00Z", "2017-10-23T14:00:00Z", "M5", "23")
 //  storeData("2016-06-01T00:00:00Z", "2016-08-01T00:00:00Z", "M5", "test")
 
   val duration = Duration.between(LocalDateTime.now, startTime)
@@ -117,12 +117,18 @@ object CandleStreamer extends App {
       List(c.time.toString) ++ list
     }.toOption.toList
 
+    val saveToFileFlow = Flow[CandleStick]
+      .mapConcat(extractCsv)
+      .map(_.mkString(",") + '\n')
+      .map(ByteString(_))
+    val saveToNeatFlow = Flow[CandleStick]
+      .map(_.close)
+      .map(_.toString + '\n')
+      .map(ByteString(_))
+
     val exec = source(new Chart(indicators = indicators), cardinality)
-      .via(Flow[CandleStick]
-        .mapConcat(extractCsv)
-        .map(_.mkString(",") + '\n')
-        .map(ByteString(_))
-      )
+//      .via(saveToFileFlow)
+      .via(saveToNeatFlow)
       .toMat(sink)(Keep.right)
       .run()
 

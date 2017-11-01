@@ -27,7 +27,7 @@ object PriceStreamer extends App {
 
   val accountId = AccountID(GlobalProperties.TradingAccountId)
   val eurUsd = InstrumentName("EUR_USD")
-  val usdGbp = InstrumentName("GBP_USD")
+//  val usdGbp = InstrumentName("GBP_USD")
 
   def params(instrumentName: InstrumentName) = Seq(
     Option(s"instruments=${Seq(instrumentName).map(_.value).mkString(",")}"),
@@ -39,26 +39,28 @@ object PriceStreamer extends App {
     uri = s"https://stream-fxtrade.oanda.com${url(eurUsd)}",
     headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
 
+/*
   val gbpUsdResponse = Http().singleRequest(HttpRequest(
     uri = s"https://stream-fxtrade.oanda.com${url(usdGbp)}",
     headers = List(RawHeader("Authorization", GlobalProperties.OandaToken))))
+*/
 
   for {
     eurUsd <- eurUsdResponse
-    gbpUsd <- gbpUsdResponse
+//    gbpUsd <- gbpUsdResponse
   } yield {
     RunnableGraph.fromGraph(GraphDSL.create() { implicit builder =>
       import GraphDSL.Implicits._
 
       val source1 = eurUsd.entity.dataBytes
-      val source2 = gbpUsd.entity.dataBytes
+//      val source2 = gbpUsd.entity.dataBytes
 
-      val merge = builder.add(Merge[ByteString](2))
+//      val merge = builder.add(Merge[ByteString](2))
 
       val flow = Framing.delimiter(ByteString("\n"), maximumFrameLength = 99999, allowTruncation = true).map(bs => bs.utf8String)
 
-      source1 ~> merge ~> flow ~> Sink.foreach[String](println)
-      source2 ~> merge
+      source1 ~> flow ~> Sink.foreach[String](println)
+//      source2 ~> merge
 
       ClosedShape
     }).run()
