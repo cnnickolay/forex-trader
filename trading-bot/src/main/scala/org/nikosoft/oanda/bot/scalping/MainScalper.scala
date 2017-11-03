@@ -1,7 +1,7 @@
 package org.nikosoft.oanda.bot.scalping
 
 import java.nio.file.Paths
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 import java.time.format.DateTimeFormatter
 
 import akka.actor.ActorSystem
@@ -9,12 +9,13 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{FileIO, Flow, Framing, Sink, Source}
+import akka.stream.scaladsl.{FileIO, Flow, Framing, Keep, Sink, Source}
 import akka.util.ByteString
 import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
+import org.nikosoft.oanda.bot.scalping.tradingmodels.BigSMATradingModel
 import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, SMACandleCloseIndicator}
 
 import scala.annotation.tailrec
@@ -23,7 +24,7 @@ import scala.concurrent.duration.Duration.Inf
 
 object MainScalper extends App {
 
-  import TraderModel._
+  import Model._
 
   implicit val actorSystem = ActorSystem("streamer")
   implicit val materializer = ActorMaterializer()
@@ -92,58 +93,75 @@ object MainScalper extends App {
       )
   }
 
-  val indicators = Seq(
-    //    new MACDCandleCloseIndicator(),
-    new SMACandleCloseIndicator(168) /*,
-    new EMACandleCloseIndicator(20),
-    new EMACandleCloseIndicator(30),
-    new EMACandleCloseIndicator(40),
-    new EMACandleCloseIndicator(50),
-    new EMACandleCloseIndicator(100)*/
-  )
+  def singleRun() = {
+    val model = new BigSMATradingModel(15, 600, 44, 100, 140)
+    val trader = new Trader(model)
 
-/*
-  val printAllSink = Sink.foreach[Order] {
-    case order@Order(_, _, _, _, _, _, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | CancelledOrder)) =>
-      println(s"State $orderState, type ${order.orderType}, profit: ${order.profitPips}, duration ${order.duration}, open price ${order.openAtPrice}, stop loss ${order.stopLoss}, take profit ${order.takeProfit}, close price $closedAtPrice, open at ${boughtAt.time}, closed at ${closedAt.time}")
-      println(">> " + trader.stats)
-    case _ =>
+    Await.ready(
+      csvSource(new Chart(indicators = Seq(new SMACandleCloseIndicator(model.smaRange))), s"/Users/niko/projects/oanda-trader/eur_usd_raw_2017_H1.csv")
+        .via(Flow[CandleStick].sliding(2, 1).map(candles => trader.processCandles(candles.toList)))
+        .runWith(Sink.ignore), Inf)
+
+    trader.orders.reverse.foldLeft(0) ((profit, order) => order match {
+      case order@Order(_, _, _, _, _, _, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | ClosedByTimeOrder), _, _) =>
+        val totalProfit = profit + order.profitPips
+        println(s"Total profit $totalProfit, state $orderState, type ${order.orderType}, profit: ${order.profitPips}, duration ${order.duration}, open price ${order.openAtPrice}, stop loss ${order.stopLoss}, take profit ${order.takeProfit}, close price $closedAtPrice, open at ${boughtAt.time}, closed at ${closedAt.time}")
+        totalProfit
+      case _ => profit
+    })
+
+    println(trader.statsString)
   }
-*/
-  case class TraderParams(minTakeProfit: Int, stopTradingAfterHours: Int)
 
-  val params = for {
-    minTakeProfit <- List(100, 150, 200)
-    stopTradingAfterHours <- (8 to 40 by 4).toList
-  } yield TraderParams(minTakeProfit, stopTradingAfterHours)
+  def findBestParams() = {
+    val smaList = (50 to 500 by 50).toList
 
-  params.par.foreach(param => {
-    val trader2015 = new Trader(commission = 15, openOrderOffset = 20, minTakeProfit = param.minTakeProfit, stopLoss = 5, stopTradingAfterHours = param.stopTradingAfterHours)
-    Await.ready(
-      csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2015_H1.csv")
-        .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader2015.processCandles(candles).toList))
-        .runWith(Sink.ignore), Inf)
+    val years = 2015 +: Nil
+//    val years = /*2015 +: 2016 +: */2017 +: Nil
 
-    val trader2016 = new Trader(commission = 15, openOrderOffset = 20, minTakeProfit = param.minTakeProfit, stopLoss = 5, stopTradingAfterHours = param.stopTradingAfterHours)
-    Await.ready(
-      csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2016_H1.csv")
-        .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader2016.processCandles(candles).toList))
-        .runWith(Sink.ignore), Inf)
+    val candlesByYear = years.map { year =>
+      val exec = csvSource(new Chart(indicators = smaList.map(new SMACandleCloseIndicator(_))), s"/Users/niko/projects/oanda-trader/eur_usd_raw_${year}_H1.csv").toMat(Sink.seq)(Keep.right).run
+      (year, Await.result(exec, Inf).toList)
+    }.toMap
 
-    val trader2017 = new Trader(commission = 15, openOrderOffset = 20, minTakeProfit = param.minTakeProfit, stopLoss = 5, stopTradingAfterHours = param.stopTradingAfterHours)
-    Await.ready(
-      csvSource(new Chart(indicators = indicators), "/Users/niko/projects/oanda-trader/eur_usd_raw_2017_H1.csv")
-        .via(Flow[CandleStick].sliding(4, 1).mapConcat(candles => trader2017.processCandles(candles).toList))
-        .runWith(Sink.ignore), Inf)
+    @volatile var totalProcessed = 0
 
-//    (param, trader2015.stats, trader2016.stats, trader2017.stats)
-    println(
-      s"""$param
-         |${trader2015.stats}
-         |${trader2016.stats}
-         |${trader2017.stats}
-         |-------------------""".stripMargin)
-  })
+    val allTraderParams = for {
+      minTakeProfit <- (200 to 2000 by 100).toList
+      stopTradingAfterHours <- (2 to 48 by 2).toList
+      stopLoss <- (50 to 150 by 10).toList
+      smaRange <- smaList
+      year <- years
+    } yield (year, new BigSMATradingModel(15, minTakeProfit, stopTradingAfterHours, smaRange, stopLoss))
+
+    println(s"Total variations to check ${allTraderParams.length}")
+    val startedAt = LocalDateTime.now
+
+    allTraderParams.par.map { case (year, model) =>
+      val trader = new Trader(model)
+      candlesByYear(year).sliding(2).foreach { case candles :+ futureCandle => trader.processCandles(candles) }
+      totalProcessed = totalProcessed + 1
+      if (totalProcessed % 1000 == 0) println(totalProcessed)
+      val traderStats = trader.stats
+      (year, model, traderStats._1, traderStats)
+    }.toList
+      .groupBy(_._1)
+      .foreach { case (year, params) =>
+        println(s"=========== $year ===============")
+        val sorted = params.sortBy(_._3).reverse
+        (sorted.take(2) ++ sorted.takeRight(2)).foreach { case (_, param, profit, stats) =>
+          println(param)
+          println(s"Profit $profit")
+          println(s"Profit $stats")
+          println("-----------------")
+        }
+      }
+
+    println(s"Total duration ${Duration.between(startedAt, LocalDateTime.now).toString}")
+  }
+
+//  singleRun()
+  findBestParams()
 
   Await.ready(actorSystem.terminate(), Inf)
 }
