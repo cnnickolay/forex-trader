@@ -5,7 +5,7 @@ import org.nikosoft.oanda.bot.scalping.Model.{LongOrderType, Order, ShortOrderTy
 import org.nikosoft.oanda.bot.scalping.TradingModel
 import org.nikosoft.oanda.instruments.Model
 
-class BigSMATradingModel(val commission: Int, val minTakeProfit: Int, val stopTradingAfterHours: Int, val smaRange: Int, val stopLoss: Int) extends TradingModel {
+class BigSMATradingModelWithStopLoss(val commission: Int, val minTakeProfit: Int, val stopTradingAfterHours: Int, val smaRange: Int, val stopLoss: Int) extends TradingModel {
   override def openOrder(candles: List[Model.CandleStick]) = {
     val current = candles.head
 
@@ -26,8 +26,7 @@ class BigSMATradingModel(val commission: Int, val minTakeProfit: Int, val stopTr
     val candle = candles.head
     if (new Duration(boughtAt.time, candle.time).getStandardHours >= stopTradingAfterHours) {
       Some(order.copy(orderState = ClosedByTimeOrder, closedAtPrice = candle.close, closedAtCandle = Some(candle)))
-    } else if ()
-    else Option.empty[Order]
+    } else Option.empty[Order]
   }
 
   override def toString = s"BigSMATradingModel($commission,$minTakeProfit,$stopTradingAfterHours,$smaRange,$stopLoss)"

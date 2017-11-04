@@ -15,7 +15,7 @@ import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 import org.nikosoft.oanda.api.`def`.InstrumentApi.CandlesResponse
-import org.nikosoft.oanda.bot.scalping.tradingmodels.BigSMATradingModel
+import org.nikosoft.oanda.bot.scalping.tradingmodels.BigSMATradingModelWithStopLoss
 import org.nikosoft.oanda.instruments.Model.{CandleStick, Chart, EMACandleCloseIndicator, MACDCandleCloseIndicator, SMACandleCloseIndicator}
 
 import scala.annotation.tailrec
@@ -94,7 +94,7 @@ object MainScalper extends App {
   }
 
   def singleRun() = {
-    val model = new BigSMATradingModel(15, 600, 44, 100, 140)
+    val model = new BigSMATradingModelWithStopLoss(15, 600, 44, 100, 140)
     val trader = new Trader(model)
 
     Await.ready(
@@ -132,7 +132,7 @@ object MainScalper extends App {
       stopLoss <- (50 to 150 by 10).toList
       smaRange <- smaList
       year <- years
-    } yield (year, new BigSMATradingModel(15, minTakeProfit, stopTradingAfterHours, smaRange, stopLoss))
+    } yield (year, new BigSMATradingModelWithStopLoss(15, minTakeProfit, stopTradingAfterHours, smaRange, stopLoss))
 
     println(s"Total variations to check ${allTraderParams.length}")
     val startedAt = LocalDateTime.now

@@ -1,11 +1,12 @@
 package org.nikosoft.oanda.bot.scalping
 
 import org.joda.time.Duration
+import org.nikosoft.oanda.bot.scalping.Model.PositionType.PositionType
+import org.nikosoft.oanda.bot.scalping.Model.TradeType.TradeType
 import org.nikosoft.oanda.instruments.Model.CandleStick
 import org.nikosoft.oanda.instruments.Oscillators.MACDItem
 
 import scala.math.BigDecimal.RoundingMode
-import scalaz.Scalaz._
 
 
 object Model {
@@ -26,36 +27,44 @@ object Model {
     def toRate: BigDecimal = BigDecimal(value) / pipsCoef
   }
 
-  abstract class OrderType
-  case object LongOrderType extends OrderType
-  case object ShortOrderType extends OrderType
+  object PositionType extends Enumeration {
+    type PositionType = Value
+    val LongPosition, ShortPosition = Value
+  }
 
-  abstract class OrderState
-  case object PendingOrder extends OrderState
-  case object ExecutedOrder extends OrderState
-  case object TakeProfitOrder extends OrderState
-  case object StopLossOrder extends OrderState
-  case object ClosedByTimeOrder extends OrderState
-  case object CancelledOrder extends OrderState
+  abstract class Order() {
+    def chainedOrders: List[Order]
+    def orderCreatedAt: CandleStick
 
-  case class Order(orderType: OrderType, openAtPrice: Option[BigDecimal] = None, commissionPips: Int,
-                   takeProfit: Int, stopLoss: Int,
-                   createdAtCandle: CandleStick, closedAtPrice: BigDecimal = 0, boughtAtCandle: Option[CandleStick] = None,
-                   closedAtCandle: Option[CandleStick] = None, orderState: OrderState = PendingOrder,
-                   takeProfitAtPrice: Option[BigDecimal] = None, stopLossAtPrice: Option[BigDecimal] = None) {
-    def profitPips = ((orderType, openAtPrice) match {
-      case (LongOrderType, Some(openedAtPrice)) => closedAtPrice - openedAtPrice
-      case (ShortOrderType, Some(openedAtPrice)) => openedAtPrice - closedAtPrice
+    def findTakeProfitOrder: Option[TakeProfitOrder] = chainedOrders.find(_.getClass == classOf[TakeProfitOrder]).map(_.asInstanceOf[TakeProfitOrder])
+    def findStopLossOrder: Option[StopLossOrder] = chainedOrders.find(_.getClass == classOf[StopLossOrder]).map(_.asInstanceOf[StopLossOrder])
+  }
+  case class MarketOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order
+  case class LimitOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order
+  case class StopLossOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order], price: BigDecimal) extends Order
+  case class TakeProfitOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order], price: BigDecimal) extends Order
+
+  case class Position(creationOrder: Order,
+                      executionPrice: BigDecimal,
+                      executionCandle: CandleStick,
+                      positionType: PositionType)
+
+  object TradeType extends Enumeration {
+    type TradeType = Value
+    val TakeProfit, StopLoss, ManualClose = Value
+  }
+
+  case class Trade(commissionPips: Int,
+                   orderClosedAt: CandleStick,
+                   closedAtPrice: BigDecimal,
+                   tradeType: TradeType,
+                   position: Position) {
+    def profitPips = (position.positionType match {
+      case PositionType.LongPosition => closedAtPrice - position.executionPrice
+      case PositionType.ShortPosition => position.executionPrice - closedAtPrice
     }).toPips - commissionPips
 
-    def duration = (boughtAtCandle |@| closedAtCandle) { (b, c) =>
-      new Duration(b.time, c.time).toStandardHours.toString
-    }.getOrElse("")
+    def duration = new Duration(position.executionCandle.time, orderClosedAt.time).toStandardHours.toString
   }
 
-  def calculateProfit(orderType: OrderType, openPrice: BigDecimal, last: CandleStick, first: CandleStick, commission: Int) = {
-    if (orderType == LongOrderType) ((last.high - openPrice) * pipsCoef).toInt - commission
-    else if (orderType == ShortOrderType) ((openPrice - last.low) * pipsCoef).toInt - commission
-    else 0
-  }
 }

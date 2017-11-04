@@ -9,23 +9,26 @@ class Trader(tradingModel: TradingModel) {
   var currentOrderOption: Option[Order] = None
   var orders: List[Order] = List.empty
 
-  def processCandles(candles: List[CandleStick]): Unit = currentOrderOption match {
+    def processCandles(candles: List[CandleStick]): Unit = currentOrderOption match {
     case None => currentOrderOption = tradingModel.openOrder(candles)
-    case Some(order) if order.orderState == PendingOrder =>
-      val candle = candles.head
-      val takeProfitRate = candle.open + order.takeProfit.abs.toRate * (if (order.orderType == ShortOrderType) -1 else 1)
-      val stopLossRate = candle.open + order.stopLoss.toRate * (if (order.orderType == ShortOrderType) 1 else -1)
-
-      currentOrderOption = Option(order.copy(
-        boughtAtCandle = Some(candle),
-        openAtPrice = Some(candle.open),
-        orderState = ExecutedOrder,
-        takeProfitAtPrice = Option(takeProfitRate),
-        stopLossAtPrice = Option(stopLossRate)
-      ))
-
-      processExecutedOrder(candles, order)
+    case Some(order) if order.orderState == PendingOrder => buyAtOpenPrice(candles, order)
     case Some(order) if order.orderState == ExecutedOrder => processExecutedOrder(candles, order)
+  }
+
+  private def buyAtOpenPrice(candles: List[CandleStick], order: Order) = {
+    val candle = candles.head
+    val takeProfitRate = candle.open + order.takeProfit.abs.toRate * (if (order.orderType == ShortOrderType) -1 else 1)
+    val stopLossRate = candle.open + order.stopLoss.toRate * (if (order.orderType == ShortOrderType) 1 else -1)
+
+    currentOrderOption = Option(order.copy(
+      boughtAtCandle = Some(candle),
+      openAtPrice = Some(candle.open),
+      orderState = ExecutedOrder,
+      takeProfitAtPrice = Option(takeProfitRate),
+      stopLossAtPrice = Option(stopLossRate)
+    ))
+
+    processExecutedOrder(candles, order)
   }
 
   private def processExecutedOrder(candles: List[CandleStick], order: Order) = {
