@@ -70,47 +70,20 @@ class Trader(commission: Int, tradingModel: TradingModel) {
     case _ => None
   }
 
-/*  private def buyAtOpenPrice(candles: List[CandleStick], order: Order) = {
-    val candle = candles.head
-    val takeProfitRate = candle.open + order.takeProfit.abs.toRate * (if (order.orderType == ShortOrderType) -1 else 1)
-    val stopLossRate = candle.open + order.stopLoss.toRate * (if (order.orderType == ShortOrderType) 1 else -1)
-
-    orderOption = Option(order.copy(
-      boughtAtCandle = Some(candle),
-      openAtPrice = Some(candle.open),
-      orderState = ExecutedOrder,
-      takeProfitAtPrice = Option(takeProfitRate),
-      stopLossAtPrice = Option(stopLossRate)
-    ))
-
-    processExecutedOrder(candles, order)
-  }
-
-  private def processExecutedOrder(candles: List[CandleStick], order: Order) = {
-    takeProfit(candles.head)
-    stopLoss(candles.head)
-    tradingModel.closeOrder(candles, order).fold() { order =>
-      orders = order +: orders
-      orderOption = None
-    }
-  }
-
   def stats = {
-    val profitList = orders.map(_.profitPips)
+    val profitList = trades.map(_.profitPips)
     val positives = profitList.count(_ > 0)
     val totalPositives = profitList.filter(_ > 0).sum
     val negatives = profitList.count(_ < 0)
     val totalNegatives = profitList.filter(_ < 0).sum
     val profit = profitList.sum
     (profit, positives, negatives, totalPositives, totalNegatives)
-  }*/
+  }
 
-/*
   def statsString: String = {
     val (profit, positives, negatives, totalPositives, totalNegatives) = stats
-    s"Total trades done ${orders.size}, total profit: $profit, positives: $positives ($totalPositives), negatives: $negatives ($totalNegatives)"
+    s"Total trades done ${trades.size}, total profit: $profit, positives: $positives ($totalPositives), negatives: $negatives ($totalNegatives)"
   }
-*/
 
 }
 

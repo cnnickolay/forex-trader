@@ -8,13 +8,13 @@ object StopLossLogic {
   def stopLoss(commissionPips: Int, candle: CandleStick, position: Position): Option[Trade] =
     position.creationOrder.findStopLossOrder.fold(Option.empty[Trade]) { order =>
       if (
-        (position.positionType == PositionType.LongPosition && order.price >= candle.low) ||
-        (position.positionType == PositionType.ShortPosition && order.price <= candle.high)
+        (position.positionType == PositionType.LongPosition && order.stopLossPrice >= candle.low) ||
+        (position.positionType == PositionType.ShortPosition && order.stopLossPrice <= candle.high)
       ) {
         val trade = Trade(
           commissionPips = commissionPips,
           orderClosedAt = candle,
-          closedAtPrice = order.price,
+          closedAtPrice = order.stopLossPrice,
           tradeType = TradeType.StopLoss,
           position = position)
         Option(trade)

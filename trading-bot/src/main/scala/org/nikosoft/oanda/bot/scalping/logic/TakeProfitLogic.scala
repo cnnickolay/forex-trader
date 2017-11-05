@@ -8,13 +8,13 @@ object TakeProfitLogic {
   def takeProfit(commissionPips: Int, candle: CandleStick, position: Position): Option[Trade] =
     position.creationOrder.findTakeProfitOrder.fold(Option.empty[Trade]) { order =>
       if (
-        (position.positionType == PositionType.LongPosition && order.price <= candle.high) ||
-        (position.positionType == PositionType.ShortPosition && order.price >= candle.low)
+        (position.positionType == PositionType.LongPosition && order.takeProfitPrice <= candle.high) ||
+        (position.positionType == PositionType.ShortPosition && order.takeProfitPrice >= candle.low)
       ) {
         val trade = Trade(
           commissionPips = commissionPips,
           orderClosedAt = candle,
-          closedAtPrice = order.price,
+          closedAtPrice = order.takeProfitPrice,
           tradeType = TradeType.TakeProfit,
           position = position)
         Option(trade)

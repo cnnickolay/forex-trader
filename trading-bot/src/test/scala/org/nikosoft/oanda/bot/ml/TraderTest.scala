@@ -9,15 +9,13 @@ import org.scalatest.{FunSpec, FunSuite, Matchers}
 class TraderTest extends FunSpec with Matchers {
 
   describe("market orders") {
-    it("Market order") {
+    it("should get opened on the next candle's open price") {
       val input = List(
         CandleStick(DateTime.parse("2017-01-01T01:00:00Z").toInstant, 1.10005, 1.10010, 1.10000, 1.10003, 0, complete = true),
         CandleStick(DateTime.parse("2017-01-01T01:05:00Z").toInstant, 1.10007, 1.10015, 1.10003, 1.10008, 0, complete = true)
       )
 
       val trader = new Trader(0, new TradingModel {
-        override val commission: Int = 0
-
         override def createOrder(candle: CandleStick) = Option(MarketOrder(PositionType.ShortPosition, candle, Nil))
       })
 
@@ -40,8 +38,6 @@ class TraderTest extends FunSpec with Matchers {
       )
 
       val trader = new Trader(0, new TradingModel {
-        override val commission: Int = 0
-
         override def createOrder(candle: CandleStick) = Option(MarketOrder(PositionType.ShortPosition, candle, List(
           TakeProfitOrder(candle, 1.10000, positionType = PositionType.ShortPosition),
           StopLossOrder(candle, 1.20000, positionType = PositionType.ShortPosition)
@@ -58,6 +54,59 @@ class TraderTest extends FunSpec with Matchers {
       trader.positionOption shouldNot be(None)
     }
 
+    describe("manual close") {
+      it("should close existing position at candle closing price") {
+        val firstCandle = CandleStick(DateTime.parse("2017-01-01T01:00:00Z").toInstant, 1.10005, 1.10010, 1.10000, 1.10003, 0, complete = true)
+        val secondCandle = CandleStick(DateTime.parse("2017-01-01T01:05:00Z").toInstant, 1.10007, 1.10015, 1.10003, 1.10008, 0, complete = true)
+        val thirdCandle = CandleStick(DateTime.parse("2017-01-01T01:10:00Z").toInstant, 1.10009, 1.10020, 1.10009, 1.10010, 0, complete = true)
+
+        val trader = new Trader(0, new TradingModel {
+          override def createOrder(candle: CandleStick) = Option(MarketOrder(PositionType.ShortPosition, candle, List(
+            TakeProfitOrder(candle, 1.10000, positionType = PositionType.ShortPosition),
+            StopLossOrder(candle, 1.20000, positionType = PositionType.ShortPosition)
+          )))
+
+          override def closePosition(candle: CandleStick, position: Position) = if (candle == thirdCandle) true else false
+        })
+
+        trader.processCandles(firstCandle)
+        trader.orders should have size 1
+        trader.processCandles(secondCandle)
+        trader.orders should have size 2
+        trader.processCandles(thirdCandle)
+        trader.orders shouldBe Nil
+
+        val trade = trader.trades.head
+        trade.position.creationOrder.orderCreatedAt shouldBe firstCandle
+        trade.position.executionCandle shouldBe secondCandle
+        trade.position.executionPrice shouldBe 1.10007
+        trade.orderClosedAt shouldBe thirdCandle
+        trade.closedAtPrice shouldBe thirdCandle.close
+        trade.tradeType shouldBe TradeType.ManualClose
+      }
+    }
+
+    describe("cancelling order") {
+      it("should clean up orders") {
+        val input = List(
+          CandleStick(DateTime.parse("2017-01-01T01:00:00Z").toInstant, 1.10005, 1.10010, 1.10000, 1.10003, 0, complete = true),
+          CandleStick(DateTime.parse("2017-01-01T01:05:00Z").toInstant, 1.10007, 1.10015, 1.10003, 1.10008, 0, complete = true)
+        )
+
+        val trader = new Trader(0, new TradingModel {
+          override def createOrder(candle: CandleStick) = Option(LimitOrder(1.10000, PositionType.LongPosition, candle, Nil))
+
+          override def cancelOrder(candle: CandleStick, order: Order) = true
+        })
+
+        input.foreach(trader.processCandles)
+
+        trader.trades shouldBe Nil
+        trader.orders shouldBe Nil
+        trader.positionOption shouldBe None
+      }
+    }
+
     describe("stop loss") {
       it("Short market order with stop loss order which closes in the same candle") {
         val input = List(
@@ -67,11 +116,9 @@ class TraderTest extends FunSpec with Matchers {
         )
 
         val stopLossPrice = 1.10015
-        val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
+        val trader = new Trader(2, new TradingModel {
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.ShortPosition, candle,
-            List(StopLossOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.ShortPosition))
+            List(StopLossOrder(orderCreatedAt = candle, stopLossPrice = stopLossPrice, positionType = PositionType.ShortPosition))
           )) else None
         })
 
@@ -84,6 +131,7 @@ class TraderTest extends FunSpec with Matchers {
         trade.orderClosedAt shouldBe input(1)
         trade.closedAtPrice shouldBe stopLossPrice
         trade.tradeType shouldBe TradeType.StopLoss
+        trade.profitPips shouldBe -10
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -98,10 +146,8 @@ class TraderTest extends FunSpec with Matchers {
 
         val stopLossPrice = 1.10018
         val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.ShortPosition, candle,
-            List(StopLossOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.ShortPosition))
+            List(StopLossOrder(orderCreatedAt = candle, stopLossPrice = stopLossPrice, positionType = PositionType.ShortPosition))
           )) else None
         })
 
@@ -114,6 +160,7 @@ class TraderTest extends FunSpec with Matchers {
         trade.orderClosedAt shouldBe input(2)
         trade.closedAtPrice shouldBe stopLossPrice
         trade.tradeType shouldBe TradeType.StopLoss
+        trade.profitPips shouldBe -11
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -128,10 +175,8 @@ class TraderTest extends FunSpec with Matchers {
 
         val stopLossPrice = 1.10004
         val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.LongPosition, candle,
-            List(StopLossOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.LongPosition))
+            List(StopLossOrder(orderCreatedAt = candle, stopLossPrice = stopLossPrice, positionType = PositionType.LongPosition))
           )) else None
         })
 
@@ -144,6 +189,7 @@ class TraderTest extends FunSpec with Matchers {
         trade.orderClosedAt shouldBe input(1)
         trade.closedAtPrice shouldBe stopLossPrice
         trade.tradeType shouldBe TradeType.StopLoss
+        trade.profitPips shouldBe -3
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -158,10 +204,8 @@ class TraderTest extends FunSpec with Matchers {
 
         val stopLossPrice = 1.10003
         val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.LongPosition, candle,
-            List(StopLossOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.LongPosition))
+            List(StopLossOrder(orderCreatedAt = candle, stopLossPrice = stopLossPrice, positionType = PositionType.LongPosition))
           )) else None
         })
 
@@ -174,6 +218,7 @@ class TraderTest extends FunSpec with Matchers {
         trade.orderClosedAt shouldBe input(2)
         trade.closedAtPrice shouldBe stopLossPrice
         trade.tradeType shouldBe TradeType.StopLoss
+        trade.profitPips shouldBe -4
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -188,12 +233,10 @@ class TraderTest extends FunSpec with Matchers {
           CandleStick(DateTime.parse("2017-01-01T01:10:00Z").toInstant, 1.10009, 1.10020, 1.10009, 1.10010, 0, complete = true)
         )
 
-        val stopLossPrice = 1.10004
-        val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
+        val takeProfitPrice = 1.10004
+        val trader = new Trader(1, new TradingModel {
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.ShortPosition, candle,
-            List(TakeProfitOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.ShortPosition))
+            List(TakeProfitOrder(orderCreatedAt = candle, takeProfitPrice = takeProfitPrice, positionType = PositionType.ShortPosition))
           )) else None
         })
 
@@ -204,8 +247,9 @@ class TraderTest extends FunSpec with Matchers {
         trade.position.executionCandle shouldBe input(1)
         trade.position.executionPrice shouldBe 1.10007
         trade.orderClosedAt shouldBe input(1)
-        trade.closedAtPrice shouldBe stopLossPrice
+        trade.closedAtPrice shouldBe takeProfitPrice
         trade.tradeType shouldBe TradeType.TakeProfit
+        trade.profitPips shouldBe 2
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -218,12 +262,10 @@ class TraderTest extends FunSpec with Matchers {
           CandleStick(DateTime.parse("2017-01-01T01:10:00Z").toInstant, 1.10009, 1.10020, 1.10009, 1.10010, 0, complete = true)
         )
 
-        val stopLossPrice = 1.100014
+        val takeProfitPrice = 1.10014
         val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.LongPosition, candle,
-            List(TakeProfitOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.LongPosition))
+            List(TakeProfitOrder(orderCreatedAt = candle, takeProfitPrice = takeProfitPrice, positionType = PositionType.LongPosition))
           )) else None
         })
 
@@ -234,8 +276,9 @@ class TraderTest extends FunSpec with Matchers {
         trade.position.executionCandle shouldBe input(1)
         trade.position.executionPrice shouldBe 1.10007
         trade.orderClosedAt shouldBe input(1)
-        trade.closedAtPrice shouldBe stopLossPrice
+        trade.closedAtPrice shouldBe takeProfitPrice
         trade.tradeType shouldBe TradeType.TakeProfit
+        trade.profitPips shouldBe 7
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -248,12 +291,10 @@ class TraderTest extends FunSpec with Matchers {
           CandleStick(DateTime.parse("2017-01-01T01:10:00Z").toInstant, 1.10009, 1.10020, 1.10002, 1.10010, 0, complete = true)
         )
 
-        val stopLossPrice = 1.10003
+        val takeProfitPrice = 1.10003
         val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.ShortPosition, candle,
-            List(TakeProfitOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.ShortPosition))
+            List(TakeProfitOrder(orderCreatedAt = candle, takeProfitPrice = takeProfitPrice, positionType = PositionType.ShortPosition))
           )) else None
         })
 
@@ -264,8 +305,9 @@ class TraderTest extends FunSpec with Matchers {
         trade.position.executionCandle shouldBe input(1)
         trade.position.executionPrice shouldBe 1.10007
         trade.orderClosedAt shouldBe input(2)
-        trade.closedAtPrice shouldBe stopLossPrice
+        trade.closedAtPrice shouldBe takeProfitPrice
         trade.tradeType shouldBe TradeType.TakeProfit
+        trade.profitPips shouldBe 4
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -278,12 +320,10 @@ class TraderTest extends FunSpec with Matchers {
           CandleStick(DateTime.parse("2017-01-01T01:10:00Z").toInstant, 1.10009, 1.10020, 1.10009, 1.10010, 0, complete = true)
         )
 
-        val stopLossPrice = 1.10019
+        val takeProfitPrice = 1.10019
         val trader = new Trader(0, new TradingModel {
-          override val commission: Int = 0
-
           override def createOrder(candle: CandleStick) = if (candle == input.head) Option(MarketOrder(PositionType.LongPosition, candle,
-            List(TakeProfitOrder(orderCreatedAt = candle, price = stopLossPrice, positionType = PositionType.LongPosition))
+            List(TakeProfitOrder(orderCreatedAt = candle, takeProfitPrice = takeProfitPrice, positionType = PositionType.LongPosition))
           )) else None
         })
 
@@ -294,8 +334,9 @@ class TraderTest extends FunSpec with Matchers {
         trade.position.executionCandle shouldBe input(1)
         trade.position.executionPrice shouldBe 1.10007
         trade.orderClosedAt shouldBe input(2)
-        trade.closedAtPrice shouldBe stopLossPrice
+        trade.closedAtPrice shouldBe takeProfitPrice
         trade.tradeType shouldBe TradeType.TakeProfit
+        trade.profitPips shouldBe 12
 
         trader.orders shouldBe Nil
         trader.positionOption shouldBe None
@@ -316,8 +357,6 @@ class TraderTest extends FunSpec with Matchers {
       val targetPrice = 1.10020
 
       val trader = new Trader(0, new TradingModel {
-        override val commission: Int = 0
-
         override def createOrder(candle: CandleStick) = Option(LimitOrder(price = targetPrice, PositionType.ShortPosition, candle, Nil))
       })
 
@@ -344,8 +383,6 @@ class TraderTest extends FunSpec with Matchers {
       val targetPrice = 1.10022
 
       val trader = new Trader(0, new TradingModel {
-        override val commission: Int = 0
-
         override def createOrder(candle: CandleStick) = Option(LimitOrder(price = targetPrice, PositionType.ShortPosition, candle, Nil))
       })
 
@@ -367,8 +404,6 @@ class TraderTest extends FunSpec with Matchers {
       val targetPrice = 1.10002
 
       val trader = new Trader(0, new TradingModel {
-        override val commission: Int = 0
-
         override def createOrder(candle: CandleStick) = Option(LimitOrder(price = targetPrice, PositionType.LongPosition, candle, Nil))
       })
 
@@ -395,8 +430,6 @@ class TraderTest extends FunSpec with Matchers {
       val targetPrice = 1.10000
 
       val trader = new Trader(0, new TradingModel {
-        override val commission: Int = 0
-
         override def createOrder(candle: CandleStick) = Option(LimitOrder(price = targetPrice, PositionType.LongPosition, candle, Nil))
       })
 

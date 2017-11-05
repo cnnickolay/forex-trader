@@ -93,34 +93,30 @@ object MainScalper extends App {
       )
   }
 
-/*
   def singleRun() = {
-    val model = new BigSMATradingModelWithStopLoss(15, 600, 44, 100, 140)
-    val trader = new Trader(model)
+//    val model = new BigSMATradingModelWithStopLoss(15, 600, 44, 100, 140) suspiciously good results for all years
+    val model = new BigSMATradingModelWithStopLoss(15, 200, 4, 50, 50)
+    val trader = new Trader(15, model)
 
     Await.ready(
       csvSource(new Chart(indicators = Seq(new SMACandleCloseIndicator(model.smaRange))), s"/Users/niko/projects/oanda-trader/eur_usd_raw_2017_H1.csv")
-        .via(Flow[CandleStick].sliding(2, 1).map(candles => trader.processCandles(candles.toList)))
+        .via(Flow[CandleStick].map(trader.processCandles))
         .runWith(Sink.ignore), Inf)
 
-    trader.orders.reverse.foldLeft(0) ((profit, order) => order match {
-      case order@Order(_, _, _, _, _, _, closedAtPrice, Some(boughtAt), Some(closedAt), orderState@(TakeProfitOrder | StopLossOrder | ClosedByTimeOrder), _, _) =>
-        val totalProfit = profit + order.profitPips
-        println(s"Total profit $totalProfit, state $orderState, type ${order.orderType}, profit: ${order.profitPips}, duration ${order.duration}, open price ${order.openAtPrice}, stop loss ${order.stopLoss}, take profit ${order.takeProfit}, close price $closedAtPrice, open at ${boughtAt.time}, closed at ${closedAt.time}")
-        totalProfit
-      case _ => profit
+    trader.trades.reverse.foldLeft(0) ((profit, trade) => {
+      val totalProfit = profit + trade.profitPips
+      println(s"Total profit $totalProfit, trade type ${trade.tradeType}, position type ${trade.position.positionType}, profit: ${trade.profitPips}, duration ${trade.duration}, open price ${trade.position.executionPrice}, close price ${trade.closedAtPrice}, executed at ${trade.position.executionCandle.time}, closed at ${trade.orderClosedAt.time}")
+      totalProfit
     })
 
     println(trader.statsString)
   }
-*/
 
-/*
   def findBestParams() = {
     val smaList = (50 to 500 by 50).toList
 
     val years = 2015 +: Nil
-//    val years = /*2015 +: 2016 +: */2017 +: Nil
+//    val years = /*2015 +: 2016 +: 2017 +: Nil
 
     val candlesByYear = years.map { year =>
       val exec = csvSource(new Chart(indicators = smaList.map(new SMACandleCloseIndicator(_))), s"/Users/niko/projects/oanda-trader/eur_usd_raw_${year}_H1.csv").toMat(Sink.seq)(Keep.right).run
@@ -141,8 +137,8 @@ object MainScalper extends App {
     val startedAt = LocalDateTime.now
 
     allTraderParams.par.map { case (year, model) =>
-      val trader = new Trader(model)
-      candlesByYear(year).sliding(2).foreach { case candles :+ futureCandle => trader.processCandles(candles) }
+      val trader = new Trader(15, model)
+      candlesByYear(year).foreach { trader.processCandles }
       totalProcessed = totalProcessed + 1
       if (totalProcessed % 1000 == 0) println(totalProcessed)
       val traderStats = trader.stats
@@ -162,9 +158,8 @@ object MainScalper extends App {
 
     println(s"Total duration ${Duration.between(startedAt, LocalDateTime.now).toString}")
   }
-*/
 
-//  singleRun()
+  singleRun()
 //  findBestParams()
 
   Await.ready(actorSystem.terminate(), Inf)

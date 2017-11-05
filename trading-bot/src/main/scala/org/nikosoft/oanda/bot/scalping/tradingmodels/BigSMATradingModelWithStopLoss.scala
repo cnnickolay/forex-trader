@@ -16,17 +16,17 @@ class BigSMATradingModelWithStopLoss(val commission: Int,
     if (takeProfit.abs >= minTakeProfit) {
       val positionType = if (takeProfit < 0) PositionType.LongPosition else PositionType.ShortPosition
 
-      val takeProfitRate = candle.open + takeProfit.abs.toRate * (if (positionType == PositionType.ShortPosition) -1 else 1)
-      val stopLossRate = candle.open + stopLoss.toRate * (if (positionType == PositionType.ShortPosition) 1 else -1)
+      val takeProfitRate = candle.close + takeProfit.abs.toRate * (if (positionType == PositionType.ShortPosition) -1 else 1)
+      val stopLossRate = candle.close + stopLoss.toRate * (if (positionType == PositionType.ShortPosition) 1 else -1)
 
       val stopLossOrder = StopLossOrder(
-        price = stopLossRate,
+        stopLossPrice = stopLossRate,
         positionType = positionType,
         orderCreatedAt = candle
       )
 
       val takeProfitOrder = TakeProfitOrder(
-        price = takeProfitRate,
+        takeProfitPrice = takeProfitRate,
         orderCreatedAt = candle,
         positionType = positionType
       )

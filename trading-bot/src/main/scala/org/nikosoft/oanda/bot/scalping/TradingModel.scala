@@ -5,8 +5,6 @@ import org.nikosoft.oanda.instruments.Model.CandleStick
 
 trait TradingModel {
 
-  val commission: Int
-
   def createOrder(candle: CandleStick): Option[Order] = None
 
   def cancelOrder(candle: CandleStick, order: Order): Boolean = false
