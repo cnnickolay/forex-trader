@@ -110,6 +110,10 @@ object Model {
                          volume: Long,
                          complete: Boolean,
                          indicators: Map[String, Any] = Map.empty) {
+
+    require(high >= open && high >= close && high >= low, "High should be higher than all other values")
+    require(low <= open && low <= close && low <= high, "Low should be lower than all other values")
+
     def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: Option[String])(implicit manifest: Manifest[T]): Option[OUTPUT] = indicators.get(manifest.runtimeClass.getSimpleName + s"${conf.fold("")(s => "_" + s)}").map(_.asInstanceOf[OUTPUT])
     def indicator[T <: Indicator[_, OUTPUT], OUTPUT](conf: String)(implicit manifest: Manifest[T]): Option[OUTPUT] = indicator[T, OUTPUT](Some(conf))
   }

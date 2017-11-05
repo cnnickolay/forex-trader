@@ -1,33 +1,52 @@
 package org.nikosoft.oanda.bot.scalping.tradingmodels
 
 import org.joda.time.Duration
-import org.nikosoft.oanda.bot.scalping.Model.{LongOrderType, Order, ShortOrderType, _}
+import org.nikosoft.oanda.bot.scalping.Model.PositionType.PositionType
+import org.nikosoft.oanda.bot.scalping.Model._
 import org.nikosoft.oanda.bot.scalping.TradingModel
-import org.nikosoft.oanda.instruments.Model
+import org.nikosoft.oanda.instruments.Model.CandleStick
 
-class BigSMATradingModel(val commission: Int, val minTakeProfit: Int, val stopTradingAfterHours: Int, val smaRange: Int, val stopLoss: Int) extends TradingModel {
-  override def openOrder(candles: List[Model.CandleStick]) = {
-    val current = candles.head
+case class StopLossOnCloseOrder(orderCreatedAt: CandleStick, price: BigDecimal, positionType: PositionType) extends Order {
+  val chainedOrders: List[Order] = Nil
+}
 
-    val takeProfit = (current.close - current.sma(smaRange)).toPips
+class BigSMATradingModel(val commission: Int,
+                         val minTakeProfit: Int,
+                         val stopTradingAfterHours: Int,
+                         val smaRange: Int,
+                         val stopLoss: Int) extends TradingModel {
+
+  override def createOrder(candle: CandleStick) = {
+    val takeProfit = (candle.close - candle.sma(smaRange)).toPips
     if (takeProfit.abs >= minTakeProfit) {
-      val orderType = if (takeProfit < 0) LongOrderType else ShortOrderType
+      val positionType = if (takeProfit < 0) PositionType.LongPosition else PositionType.ShortPosition
 
-      Some(Order(orderType = orderType,
-        commissionPips = commission,
-        takeProfit = takeProfit.abs,
-        stopLoss = stopLoss,
-        createdAtCandle = current,
-        orderState = PendingOrder))
+      val takeProfitRate = candle.open + takeProfit.abs.toRate * (if (positionType == PositionType.ShortPosition) -1 else 1)
+      val stopLossRate = candle.open + stopLoss.toRate * (if (positionType == PositionType.ShortPosition) 1 else -1)
+
+      val stopLossOrder = StopLossOnCloseOrder(
+        price = stopLossRate,
+        positionType = positionType,
+        orderCreatedAt = candle
+      )
+
+      val takeProfitOrder = TakeProfitOrder(
+        price = takeProfitRate,
+        orderCreatedAt = candle,
+        positionType = positionType
+      )
+
+      Some(MarketOrder(
+        positionType = positionType,
+        orderCreatedAt = candle,
+        chainedOrders = List(stopLossOrder, takeProfitOrder)))
     } else None
   }
 
-  override def closeOrder(candles: List[Model.CandleStick], order: Order) = order.boughtAtCandle.fold(Option.empty[Order]) { boughtAt =>
-    val candle = candles.head
-    if (new Duration(boughtAt.time, candle.time).getStandardHours >= stopTradingAfterHours) {
-      Some(order.copy(orderState = ClosedByTimeOrder, closedAtPrice = candle.close, closedAtCandle = Some(candle)))
-    } else if ()
-    else Option.empty[Order]
+  override def closePosition(candle: CandleStick, position: Position) = {
+    if (new Duration(position.executionCandle.time, candle.time).getStandardHours >= stopTradingAfterHours) {
+      true
+    } else false
   }
 
   override def toString = s"BigSMATradingModel($commission,$minTakeProfit,$stopTradingAfterHours,$smaRange,$stopLoss)"

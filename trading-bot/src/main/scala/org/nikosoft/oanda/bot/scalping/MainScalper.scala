@@ -93,6 +93,7 @@ object MainScalper extends App {
       )
   }
 
+/*
   def singleRun() = {
     val model = new BigSMATradingModelWithStopLoss(15, 600, 44, 100, 140)
     val trader = new Trader(model)
@@ -112,7 +113,9 @@ object MainScalper extends App {
 
     println(trader.statsString)
   }
+*/
 
+/*
   def findBestParams() = {
     val smaList = (50 to 500 by 50).toList
 
@@ -159,9 +162,10 @@ object MainScalper extends App {
 
     println(s"Total duration ${Duration.between(startedAt, LocalDateTime.now).toString}")
   }
+*/
 
 //  singleRun()
-  findBestParams()
+//  findBestParams()
 
   Await.ready(actorSystem.terminate(), Inf)
 }

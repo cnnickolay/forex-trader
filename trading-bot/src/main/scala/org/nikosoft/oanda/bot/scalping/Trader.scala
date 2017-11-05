@@ -1,26 +1,81 @@
 package org.nikosoft.oanda.bot.scalping
 
+import org.nikosoft.oanda.bot.scalping.logic.{StopLossLogic, TakeProfitLogic}
 import org.nikosoft.oanda.instruments.Model.CandleStick
 
-class Trader(tradingModel: TradingModel) {
+class Trader(commission: Int, tradingModel: TradingModel) {
 
   import Model._
 
-  var currentOrderOption: Option[Order] = None
   var orders: List[Order] = List.empty
+  var positionOption: Option[Position] = None
+  var trades: List[Trade] = List.empty
 
-    def processCandles(candles: List[CandleStick]): Unit = currentOrderOption match {
-    case None => currentOrderOption = tradingModel.openOrder(candles)
-    case Some(order) if order.orderState == PendingOrder => buyAtOpenPrice(candles, order)
-    case Some(order) if order.orderState == ExecutedOrder => processExecutedOrder(candles, order)
+  def processCandles(candle: CandleStick): Unit = (orders, positionOption) match {
+    case (Nil, None) => orders = tradingModel.createOrder(candle).toList
+    case (order +: Nil, None) =>
+      if (tradingModel.cancelOrder(candle, order)) orders = Nil
+      else {
+        positionOption = executeMarketOrder(candle, order) orElse executeLimitOrder(candle, order)
+        if (positionOption.isDefined) {
+          orders = orders.filterNot(_ == order) ++ order.chainedOrders
+          processCandles(candle)
+        }
+      }
+    case (_, Some(position)) =>
+      val trade = TakeProfitLogic.takeProfit(commission, candle, position) orElse
+        StopLossLogic.stopLoss(commission, candle, position) orElse
+        closePosition(candle, position)
+      trade.fold() { trade =>
+        trades = trade +: trades
+        positionOption = None
+        orders = Nil
+      }
   }
 
-  private def buyAtOpenPrice(candles: List[CandleStick], order: Order) = {
+  def closePosition(candle: CandleStick, position: Position) = {
+    if (tradingModel.closePosition(candle, position))
+      Option(Trade(
+        commissionPips = commission,
+        orderClosedAt = candle,
+        closedAtPrice = candle.close,
+        tradeType = TradeType.ManualClose,
+        position = position))
+    else Option.empty[Trade]
+  }
+
+  def executeMarketOrder(candle: CandleStick, order: Order): Option[Position] = order match {
+    case marketOrder: MarketOrder =>
+      Option(Position(
+        creationOrder = marketOrder,
+        executionPrice = candle.open,
+        executionCandle = candle,
+        positionType = marketOrder.positionType))
+    case _ => None
+  }
+
+  def executeLimitOrder(candle: CandleStick, order: Order): Option[Position] = order match {
+    case limitOrder: LimitOrder =>
+      val position = Position(
+        creationOrder = limitOrder,
+        executionPrice = limitOrder.price,
+        executionCandle = candle,
+        positionType = limitOrder.positionType)
+
+      if (limitOrder.positionType == PositionType.LongPosition && candle.low <= limitOrder.price) {
+        Option(position)
+      } else if (limitOrder.positionType == PositionType.ShortPosition && candle.high >= limitOrder.price) {
+        Option(position)
+      } else None
+    case _ => None
+  }
+
+/*  private def buyAtOpenPrice(candles: List[CandleStick], order: Order) = {
     val candle = candles.head
     val takeProfitRate = candle.open + order.takeProfit.abs.toRate * (if (order.orderType == ShortOrderType) -1 else 1)
     val stopLossRate = candle.open + order.stopLoss.toRate * (if (order.orderType == ShortOrderType) 1 else -1)
 
-    currentOrderOption = Option(order.copy(
+    orderOption = Option(order.copy(
       boughtAtCandle = Some(candle),
       openAtPrice = Some(candle.open),
       orderState = ExecutedOrder,
@@ -36,30 +91,8 @@ class Trader(tradingModel: TradingModel) {
     stopLoss(candles.head)
     tradingModel.closeOrder(candles, order).fold() { order =>
       orders = order +: orders
-      currentOrderOption = None
+      orderOption = None
     }
-  }
-
-  def takeProfit(candle: CandleStick) = for {
-    order <- currentOrderOption
-    takeProfitAtPrice <- order.takeProfitAtPrice
-  } yield if (
-    (order.orderType == LongOrderType && takeProfitAtPrice <= candle.high) ||
-    (order.orderType == ShortOrderType && takeProfitAtPrice >= candle.low)
-  ) {
-    orders = order.copy(orderState = TakeProfitOrder, closedAtPrice = takeProfitAtPrice, closedAtCandle = Some(candle)) +: orders
-    currentOrderOption = None
-  }
-
-  def stopLoss(candle: CandleStick) = for {
-    order <- currentOrderOption
-    stopLossAtPrice <- order.stopLossAtPrice
-  } yield if (
-    (order.orderType == LongOrderType && stopLossAtPrice >= candle.low) ||
-    (order.orderType == ShortOrderType && stopLossAtPrice <= candle.high)
-  ) {
-    orders = order.copy(orderState = StopLossOrder, closedAtPrice = stopLossAtPrice, closedAtCandle = Some(candle)) +: orders
-    currentOrderOption = None
   }
 
   def stats = {
@@ -70,12 +103,14 @@ class Trader(tradingModel: TradingModel) {
     val totalNegatives = profitList.filter(_ < 0).sum
     val profit = profitList.sum
     (profit, positives, negatives, totalPositives, totalNegatives)
-  }
+  }*/
 
+/*
   def statsString: String = {
     val (profit, positives, negatives, totalPositives, totalNegatives) = stats
     s"Total trades done ${orders.size}, total profit: $profit, positives: $positives ($totalPositives), negatives: $negatives ($totalNegatives)"
   }
+*/
 
 }
 

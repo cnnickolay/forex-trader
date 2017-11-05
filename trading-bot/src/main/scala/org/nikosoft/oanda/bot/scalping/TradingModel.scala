@@ -7,8 +7,10 @@ trait TradingModel {
 
   val commission: Int
 
-  def openOrder(candles: List[CandleStick]): Option[Order]
+  def createOrder(candle: CandleStick): Option[Order] = None
 
-  def closeOrder(candles: List[CandleStick], order: Order): Option[Order]
+  def cancelOrder(candle: CandleStick, order: Order): Boolean = false
+
+  def closePosition(candle: CandleStick, position: Position): Boolean = false
 
 }

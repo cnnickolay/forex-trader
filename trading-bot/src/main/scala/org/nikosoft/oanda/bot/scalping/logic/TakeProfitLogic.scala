@@ -5,9 +5,8 @@ import org.nikosoft.oanda.instruments.Model.CandleStick
 
 object TakeProfitLogic {
 
-  def takeProfit(commissionPips: Int, candles: List[CandleStick], position: Position): Option[Trade] =
+  def takeProfit(commissionPips: Int, candle: CandleStick, position: Position): Option[Trade] =
     position.creationOrder.findTakeProfitOrder.fold(Option.empty[Trade]) { order =>
-      val candle = candles.head
       if (
         (position.positionType == PositionType.LongPosition && order.price <= candle.high) ||
         (position.positionType == PositionType.ShortPosition && order.price >= candle.low)

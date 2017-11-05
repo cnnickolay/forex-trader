@@ -39,10 +39,14 @@ object Model {
     def findTakeProfitOrder: Option[TakeProfitOrder] = chainedOrders.find(_.getClass == classOf[TakeProfitOrder]).map(_.asInstanceOf[TakeProfitOrder])
     def findStopLossOrder: Option[StopLossOrder] = chainedOrders.find(_.getClass == classOf[StopLossOrder]).map(_.asInstanceOf[StopLossOrder])
   }
-  case class MarketOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order
-  case class LimitOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order
-  case class StopLossOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order], price: BigDecimal) extends Order
-  case class TakeProfitOrder(orderCreatedAt: CandleStick, chainedOrders: List[Order], price: BigDecimal) extends Order
+  case class MarketOrder(positionType: PositionType, orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order
+  case class LimitOrder(price: BigDecimal, positionType: PositionType, orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order
+  case class StopLossOrder(orderCreatedAt: CandleStick, price: BigDecimal, positionType: PositionType) extends Order {
+    val chainedOrders: List[Order] = Nil
+  }
+  case class TakeProfitOrder(orderCreatedAt: CandleStick, price: BigDecimal, positionType: PositionType) extends Order {
+    val chainedOrders: List[Order] = Nil
+  }
 
   case class Position(creationOrder: Order,
                       executionPrice: BigDecimal,
