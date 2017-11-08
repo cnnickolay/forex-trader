@@ -29,4 +29,6 @@ val akkaDependencies = {
   )
 }
 
-libraryDependencies ++= sparkDependencies ++ akkaDependencies
+val otherDependendies = Seq("org.apache.commons" % "commons-math3" % "3.6.1")
+
+libraryDependencies ++= sparkDependencies ++ akkaDependencies ++ otherDependendies
