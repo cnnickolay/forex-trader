@@ -25,7 +25,8 @@ val akkaDependencies = {
   Seq(
     "com.typesafe.akka" % "akka-actor_2.11" % version,
     "com.typesafe.akka" % "akka-stream_2.11" % version,
-    "com.typesafe.akka" % "akka-stream-contrib_2.11" % "0.8"
+    "com.typesafe.akka" % "akka-stream-contrib_2.11" % "0.8",
+    "com.typesafe.akka" % "akka-stream-kafka_2.11" % "0.17"
   )
 }
 

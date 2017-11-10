@@ -4,5 +4,6 @@ version := "0.02"
 
 scalaVersion := "2.11.11"
 
-mainClass in assembly := Some("org.nikosoft.oanda.bot.Launcher")
-assemblyOutputPath in assembly := file(s"target/trader_${version.value}.jar")
+enablePlugins(JavaAppPackaging)
+
+mainClass in Compile := Some("org.nikosoft.oanda.bot.streaming.PriceStreamer")

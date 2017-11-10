@@ -15,7 +15,7 @@ object Model {
   implicit class CandleStickPimped(candleStick: CandleStick) {
     def macdHistogram = candleStick.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].histogram.getOrElse(BigDecimal(0))
     def macdHistogramPips = (candleStick.indicators("MACDCandleCloseIndicator").asInstanceOf[MACDItem].histogram.getOrElse(BigDecimal(0)) * pipsCoef).toInt
-    def sma(precision: Int) = candleStick.indicators.get(s"SMACandleCloseIndicator_$precision").map(_.asInstanceOf[BigDecimal].setScale(5, RoundingMode.HALF_UP).toDouble).getOrElse(0.0)
+    def sma(precision: Int) = candleStick.indicators.get(s"SMACandleCloseIndicator_$precision").map(_.asInstanceOf[BigDecimal].setScale(5, RoundingMode.HALF_UP).toDouble)
     def cmo = candleStick.indicators.get("CMOCandleCloseIndicator_8").map(_.asInstanceOf[BigDecimal].toDouble).getOrElse(0.0)
   }
 
@@ -38,7 +38,7 @@ object Model {
 
     def findTakeProfitOrder: Option[TakeProfitOrder] = chainedOrders.find(_.getClass == classOf[TakeProfitOrder]).map(_.asInstanceOf[TakeProfitOrder])
     def findStopLossOrder: Option[StopLossOrder] = chainedOrders.find(_.getClass == classOf[StopLossOrder]).map(_.asInstanceOf[StopLossOrder])
-    def findOrderByClass[T <: Order](orderClass: Class[T]): Option[StopLossOrder] = chainedOrders.find(_.getClass == orderClass).map(_.asInstanceOf[StopLossOrder])
+    def findOrderByClass[T <: Order](orderClass: Class[T]): Option[T] = chainedOrders.find(_.getClass == orderClass).map(_.asInstanceOf[T])
   }
   case class MarketOrder(positionType: PositionType, orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order
   case class LimitOrder(price: BigDecimal, positionType: PositionType, orderCreatedAt: CandleStick, chainedOrders: List[Order]) extends Order

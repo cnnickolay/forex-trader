@@ -11,8 +11,8 @@ class BigSMATradingModelWithStopLoss(val commission: Int,
                                      val smaRange: Int,
                                      val stopLoss: Int) extends TradingModel {
 
-  override def createOrder(candle: CandleStick) = {
-    val takeProfit = (candle.close - candle.sma(smaRange)).toPips
+  override def createOrder(candle: CandleStick) = candle.sma(smaRange).flatMap { sma =>
+    val takeProfit = (candle.close - sma).toPips
     if (takeProfit.abs >= minTakeProfit) {
       val positionType = if (takeProfit < 0) PositionType.LongPosition else PositionType.ShortPosition
 

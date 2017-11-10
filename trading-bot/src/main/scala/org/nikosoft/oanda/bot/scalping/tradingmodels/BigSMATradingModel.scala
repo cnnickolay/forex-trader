@@ -11,13 +11,14 @@ case class StopLossOnCloseOrder(orderCreatedAt: CandleStick, price: BigDecimal, 
 }
 
 class BigSMATradingModel(val commission: Int,
+                         val dontStopBefore: Int,
                          val minTakeProfit: Int,
                          val stopTradingAfterHours: Int,
                          val smaRange: Int,
                          val stopLoss: Int) extends TradingModel {
 
-  override def createOrder(candle: CandleStick) = {
-    val takeProfit = (candle.close - candle.sma(smaRange)).toPips
+  override def createOrder(candle: CandleStick) = candle.sma(smaRange).flatMap { sma =>
+    val takeProfit = (candle.close - sma).toPips
     if (takeProfit.abs >= minTakeProfit) {
       val positionType = if (takeProfit < 0) PositionType.LongPosition else PositionType.ShortPosition
 
@@ -44,13 +45,16 @@ class BigSMATradingModel(val commission: Int,
   }
 
   override def closePosition(candle: CandleStick, position: Position) = {
-    if (new Duration(position.executionCandle.time, candle.time).getStandardHours >= stopTradingAfterHours) {
+    val hoursPassed = new Duration(position.executionCandle.time, candle.time).getStandardHours
+    if (hoursPassed < dontStopBefore) {
+      false
+    } else if (hoursPassed >= stopTradingAfterHours) {
       true
     } else {
       position.creationOrder.findOrderByClass(classOf[StopLossOnCloseOrder]).fold(false) { order =>
         if (
-          (position.positionType == PositionType.LongPosition && order.stopLossPrice >= candle.close) ||
-          (position.positionType == PositionType.ShortPosition && order.stopLossPrice <= candle.close)
+          (position.positionType == PositionType.LongPosition && order.price >= candle.close) ||
+          (position.positionType == PositionType.ShortPosition && order.price <= candle.close)
         ) {
           true
         } else false

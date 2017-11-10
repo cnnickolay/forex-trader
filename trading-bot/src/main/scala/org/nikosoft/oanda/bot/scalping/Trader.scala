@@ -3,7 +3,7 @@ package org.nikosoft.oanda.bot.scalping
 import org.nikosoft.oanda.bot.scalping.logic.{StopLossLogic, TakeProfitLogic}
 import org.nikosoft.oanda.instruments.Model.CandleStick
 
-class Trader(commission: Int, tradingModel: TradingModel) {
+class Trader(commission: Int, var tradingModel: TradingModel) {
 
   import Model._
 
@@ -11,7 +11,7 @@ class Trader(commission: Int, tradingModel: TradingModel) {
   var positionOption: Option[Position] = None
   var trades: List[Trade] = List.empty
 
-  def processCandles(candle: CandleStick): Unit = (orders, positionOption) match {
+    def processCandles(candle: CandleStick): Unit = (orders, positionOption) match {
     case (Nil, None) => orders = tradingModel.createOrder(candle).toList
     case (order +: Nil, None) =>
       if (tradingModel.cancelOrder(candle, order)) orders = Nil
@@ -23,7 +23,8 @@ class Trader(commission: Int, tradingModel: TradingModel) {
         }
       }
     case (_, Some(position)) =>
-      val trade = TakeProfitLogic.takeProfit(commission, candle, position) orElse
+      val trade =
+        TakeProfitLogic.takeProfit(commission, candle, position) orElse
         StopLossLogic.stopLoss(commission, candle, position) orElse
         closePosition(candle, position)
       trade.fold() { trade =>
@@ -46,11 +47,13 @@ class Trader(commission: Int, tradingModel: TradingModel) {
 
   def executeMarketOrder(candle: CandleStick, order: Order): Option[Position] = order match {
     case marketOrder: MarketOrder =>
-      Option(Position(
+      val position = Position(
         creationOrder = marketOrder,
         executionPrice = candle.open,
         executionCandle = candle,
-        positionType = marketOrder.positionType))
+        positionType = marketOrder.positionType)
+//      println(s"Position type ${position.positionType}, order open price ${position.creationOrder.orderCreatedAt.open}, execution price ${position.executionPrice}, take profit at ${position.creationOrder.findTakeProfitOrder.map(_.takeProfitPrice)}, stop loss at ${position.creationOrder.findStopLossOrder.map(_.stopLossPrice)}")
+      Option(position)
     case _ => None
   }
 
@@ -79,6 +82,8 @@ class Trader(commission: Int, tradingModel: TradingModel) {
     val profit = profitList.sum
     (profit, positives, negatives, totalPositives, totalNegatives)
   }
+
+  def tradesFrom(candle: CandleStick): List[Trade] = trades.filter(_.position.creationOrder.orderCreatedAt.time.isAfter(candle.time))
 
   def statsString: String = {
     val (profit, positives, negatives, totalPositives, totalNegatives) = stats
