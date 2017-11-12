@@ -76,7 +76,7 @@ object PriceScalper extends App {
   }
 
   val divergenceThreshold = 50
-  val defaultTakeProfit = 30
+  val defaultTakeProfit = 50
   val secondsToCalculateAverage = 60 * 60
 
   var openOrders: List[Order] = Nil
@@ -84,15 +84,15 @@ object PriceScalper extends App {
 
   def calculateSlope(prices: Seq[Price]): Unit = {
     val lastPrice: Price = prices.head
-    val fromPrice = lastPrice.time.minusSeconds(secondsToCalculateAverage)
-    val values = prices.filter(_.time.isAfter(fromPrice))
-    val pairs = values
+    val fromTime = lastPrice.time.minusSeconds(secondsToCalculateAverage)
+    val (values, _) = prices.partition(_.time.isAfter(fromTime))
+    val averagePrice = values
       .map(price => {
         val normPrice = (price.asks.head.price.value.toDouble + price.bids.head.price.value.toDouble) / 2
         normPrice
       })
       .sum / values.length
-    val diverge = (meanPrice(lastPrice) - pairs).toPips
+    val diverge = (meanPrice(lastPrice) - averagePrice).toPips
     if (diverge.abs > divergenceThreshold && openOrders.isEmpty) {
       val positionType = if (diverge > 0) LongPosition else ShortPosition
       val order = Order((positionType == LongPosition) ? lastPrice.asks.head.price.value | lastPrice.bids.head.price.value, lastPrice.time, defaultTakeProfit, positionType, None)

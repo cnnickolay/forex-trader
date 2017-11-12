@@ -3,9 +3,9 @@ import Keys._
 
 object TraderBuild extends Build {
 
-  val scalaTest = "org.scalatest" % "scalatest_2.11" % "3.0.3" % "test"
-  val scalaZ = "org.scalaz" % "scalaz-core_2.11" % "7.2.13"
-  val shapeless = "com.chuusai" % "shapeless_2.11" % "2.3.2"
+  val scalaTest = "org.scalatest" % "scalatest_2.12" % "3.0.3" % "test"
+  val scalaZ = "org.scalaz" % "scalaz-core_2.12" % "7.2.13"
+  val shapeless = "com.chuusai" % "shapeless_2.12" % "2.3.2"
   val commonDependencies = Seq(scalaTest, scalaZ, shapeless)
 
   lazy val root = Project(id = "oanda-trader", base = file("."))
