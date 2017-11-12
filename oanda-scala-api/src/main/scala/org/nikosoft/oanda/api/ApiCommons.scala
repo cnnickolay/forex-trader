@@ -1,10 +1,9 @@
 package org.nikosoft.oanda.api
 
-import java.util.Properties
-
 import org.apache.http.HttpResponse
 import org.apache.http.util.EntityUtils
 import org.json4s.jackson.Serialization._
+import org.nikosoft.oanda.GlobalProperties
 import org.nikosoft.oanda.api.Errors.{ApiErrorResponse, Error}
 
 import scala.util.{Failure, Success, Try}
@@ -21,13 +20,7 @@ trait ApiCommons {
   protected val baseUrl = s"https://api-fxtrade.oanda.com/v3"
   protected val streamUrl = s"https://stream-fxtrade.oanda.com/v3"
 
-  private lazy val props: Properties = {
-    val properties = new Properties()
-    properties.load(getClass.getResourceAsStream("/api.properties"))
-    properties
-  }
-
-  protected val token = s"Bearer ${props.getProperty("token")}"
+  protected val token = GlobalProperties.OandaToken
 
   protected def handleRequest[T](response: HttpResponse)(implicit m: Manifest[T]): \/[Error, T] = {
     val content = EntityUtils.toString(response.getEntity)

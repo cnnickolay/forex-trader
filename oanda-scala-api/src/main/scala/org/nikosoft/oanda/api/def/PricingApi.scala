@@ -18,7 +18,7 @@ object PricingApi {
   /**
     * @param prices The list of Price objects requested
     */
-  case class PricingResponse(prices: Seq[Price])
+  case class PricingResponse(prices: Seq[Price], time: DateTime)
 
   type PricingOrHeartbeat = \/[PricingHeartbeat, Price]
 

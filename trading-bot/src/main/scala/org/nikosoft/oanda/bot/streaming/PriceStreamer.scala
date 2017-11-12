@@ -10,7 +10,6 @@ import akka.kafka.scaladsl.Producer
 import akka.stream.scaladsl.{Broadcast, Flow, Framing, GraphDSL, RunnableGraph, Sink, Source}
 import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.util.ByteString
-import org.apache.commons.math3.stat.regression.SimpleRegression
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSerializer}
 import org.nikosoft.oanda.GlobalProperties
@@ -19,6 +18,7 @@ import org.nikosoft.oanda.api.ApiModel.PricingModel.Price
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 
+import scala.concurrent.duration.DurationDouble
 import scala.util.Success
 
 object PriceStreamer extends App {
@@ -44,8 +44,8 @@ object PriceStreamer extends App {
   val request = HttpRequest(uri = url(eurUsd), headers = List(RawHeader("Authorization", GlobalProperties.OandaToken)))
 
   val source = Source
-    .single(request -> 1)
-    .via(Http().cachedHostConnectionPoolHttps("stream-fxtrade.oanda.com"))
+    .tick(0.seconds, 1.hour, request -> 1)
+    .via(Http().cachedHostConnectionPoolHttps(host = "stream-fxtrade.oanda.com"))
     .collect { case (Success(response), _) => response }
     .flatMapConcat(_.entity.dataBytes)
 
@@ -63,9 +63,11 @@ object PriceStreamer extends App {
 
     val producerFlow = Flow[String].map(json => new ProducerRecord[Array[Byte], String]("prices", json))
 
+    //@formatter:off
     source ~> flow ~> broadcast
-    broadcast ~> producerFlow ~> Producer.plainSink(producerSettings)
-    broadcast ~> Sink.foreach(println)
+                      broadcast ~> producerFlow ~> Producer.plainSink(producerSettings)
+                      broadcast ~> Sink.foreach(println)
+    //@formatter:on
     ClosedShape
   }).run()
 
