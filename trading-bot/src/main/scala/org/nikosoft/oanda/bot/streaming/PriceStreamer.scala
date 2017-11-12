@@ -43,7 +43,7 @@ object PriceStreamer extends App {
 
   val request = HttpRequest(uri = url(eurUsd), headers = List(RawHeader("Authorization", GlobalProperties.OandaToken)))
 
-  val source = Source
+  val source = Source//(Stream.from(1).map(_ => request -> 1))
     .tick(0.seconds, 1.hour, request -> 1)
     .via(Http().cachedHostConnectionPoolHttps(host = "stream-fxtrade.oanda.com"))
     .collect { case (Success(response), _) => response }
