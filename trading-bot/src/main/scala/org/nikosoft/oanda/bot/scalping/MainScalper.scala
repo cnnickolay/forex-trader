@@ -94,7 +94,7 @@ object MainScalper extends App {
   }
 
   def singleCandleTrader(): Unit = {
-    val model = new SingleCandleTrader(100, 80, Some(10), 0) // 2016
+    val model = new SingleCandleTrader(20, 100, 80, Some(20), 0) // 2016
     val trader = new Trader(15, model)
 
     Await.ready(
@@ -142,12 +142,13 @@ object MainScalper extends App {
     @volatile var totalProcessed = 0
 
     val allTraderParams = for {
+      tipLength <- 100 to 200 by 20
       pipsToActivate <- 100 to 300 by 25
       pipsToTakeProfit <- 20 to 150 by 10
       pipsToStopLoss <- 10 to 150 by 10
 //      maxCandlesToGo <- 0 to 20 by 1
-      year <- 2015 to 2017
-    } yield (year, new SingleCandleTrader(pipsToActivate = pipsToActivate, pipsToTakeProfit = pipsToTakeProfit, pipsToStopLoss = Option(pipsToStopLoss), maxCandlesToGo = 0))
+//      year <- 2015 to 2017
+    } yield (2017, new SingleCandleTrader(tipLength = tipLength, pipsToActivate = pipsToActivate, pipsToTakeProfit = pipsToTakeProfit, pipsToStopLoss = Option(pipsToStopLoss), maxCandlesToGo = 0))
 
     println(s"Total variations to check ${allTraderParams.length}")
     val startedAt = LocalDateTime.now

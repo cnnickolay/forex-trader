@@ -5,11 +5,12 @@ import org.nikosoft.oanda.instruments.Model.CandleStick
 
 object TakeProfitLogic {
 
-  def takeProfit(commissionPips: Int, candle: CandleStick, position: Position): Option[Trade] =
+  def takeProfit(commissionPips: Int, candle: CandleStick, position: Position): Option[Trade] = {
+    val time = candle.time.toString()
     position.creationOrder.findTakeProfitOrder.fold(Option.empty[Trade]) { order =>
       if (
         (position.positionType == PositionType.LongPosition && order.takeProfitPrice <= candle.high) ||
-        (position.positionType == PositionType.ShortPosition && order.takeProfitPrice >= candle.low)
+          (position.positionType == PositionType.ShortPosition && order.takeProfitPrice >= candle.low)
       ) {
         val trade = Trade(
           commissionPips = commissionPips,
@@ -20,5 +21,6 @@ object TakeProfitLogic {
         Option(trade)
       } else Option.empty[Trade]
     }
+  }
 
 }

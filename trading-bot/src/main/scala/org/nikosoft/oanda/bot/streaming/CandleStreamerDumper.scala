@@ -33,7 +33,7 @@ object CandleStreamerDumper extends App {
   val stepDays = 2
 
   val startTime = LocalDateTime.now
-  storeData("2015-01-01T00:00:00Z", "2016-01-01T00:00:00Z", "H1", "raw_2015")
+  storeData("2017-01-01T00:00:00Z", "2018-01-01T00:00:00Z", "H1", "raw_2017")
 
   val duration = Duration.between(LocalDateTime.now, startTime)
   println(s"Process took $duration")

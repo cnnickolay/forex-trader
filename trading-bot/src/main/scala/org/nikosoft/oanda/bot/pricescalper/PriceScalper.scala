@@ -3,7 +3,7 @@ package org.nikosoft.oanda.bot.pricescalper
 import akka.actor.ActorSystem
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.{ConsumerSettings, Subscriptions}
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
 import akka.stream.scaladsl.Sink
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, StringDeserializer}
@@ -28,7 +28,7 @@ object PriceScalper extends App {
     .withGroupId("client")
     .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
 
-//  var prices: Vector[Price] = Vector.empty
+  //  var prices: Vector[Price] = Vector.empty
 
   val sink = Sink.fold[List[Price], Price](Nil)((prices, price) => {
     val updatedPrices = price +: prices
@@ -36,30 +36,35 @@ object PriceScalper extends App {
     updatedPrices
   })
 
+  var prices: Vector[Price] = Vector.empty
+
   Consumer.committableSource(consumerSettings, Subscriptions.topics("prices"))
-    .mapConcat { record =>
+    .map { record =>
       val value = record.record.value()
       val price = read[Price](value)
-      //      if (price.time.isAfter(DateTime.now.minusHours(12))) {
-      List(price)
-      //      } else Nil
+      prices = price +: prices
+//      if (price.time.hourOfDay.get >= 6 && price.time.hourOfDay.get <= 14)
+        calculateSlope(prices)
+/*
+      val first = prices.take(2)
+      if (first.length == 2 && first.head.time.getDayOfMonth != first.last.time.getDayOfMonth) {
+        println(price)
+      }
+*/
+      //      price.time.hourOfDay()
+//      println(price.time)
+//      if (price.time.isAfter(DateTime.now.minusHours(24)) && price.time.hourOfDay.get == 6) {
+//      } else Nil
     }
-    .runWith(sink)
+    .runWith(Sink.ignore)
 
   object PositionType extends Enumeration {
     type PositionType = Value
     val LongPosition, ShortPosition = Value
   }
 
-  implicit class PricesPimped(prices: List[Price]) {
-    def meanPrice: BigDecimal = prices.map(price => (price.bids.head.price.value + price.asks.head.price.value) / 2).sum / prices.length
-  }
-
-  implicit class PricePimped(price: Price) {
-    def meanPrice: BigDecimal = (price.bids.head.price.value + price.asks.head.price.value) / 2
-  }
-
   def meanPrice(prices: List[Price]): BigDecimal = prices.map(price => (price.bids.head.price.value + price.asks.head.price.value) / 2).sum / prices.length
+
   def meanPrice(price: Price): BigDecimal = (price.bids.head.price.value + price.asks.head.price.value) / 2
 
   case class Order(creationPrice: BigDecimal, creationDate: DateTime, takeProfit: Int, positionType: PositionType, closedPrice: Option[Price] = None, closedAt: Option[DateTime] = None) {
@@ -72,40 +77,64 @@ object PriceScalper extends App {
 
     def closedAtPrice: BigDecimal = ~closedPrice.map(price => (positionType == LongPosition) ? price.closeoutBid.value | price.closeoutAsk.value)
 
-    def orderDuration = ~closedAt.map(closeDate => new Duration(creationDate, closeDate).getStandardHours)
+    def orderDuration(currentTime: DateTime): Long = new Duration(creationDate, currentTime).getStandardMinutes
+    def orderDuration: Long = ~closedAt.map(orderDuration)
   }
 
-  val divergenceThreshold = 50
-  val defaultTakeProfit = 50
-  val secondsToCalculateAverage = 60 * 60
+  val divergenceThreshold = 70
+  val distanceBetweenPrices = 5
+  val defaultTakeProfit = 30
+  val defaultStopLoss = -100
+  val secondsToCalculateAverage = 2
+  val maxMinutesToWait = 2
 
   var openOrders: List[Order] = Nil
   var closedOrders: List[Order] = Nil
+
+  def avg(price: Price): BigDecimal = (price.asks.head.price.value + price.bids.head.price.value) / 2
+  def pips(value: BigDecimal) = value * 100000
+  def spread(price: Price): Int = ((price.asks.head.price.value - price.bids.head.price.value) * 100000).toInt.abs
 
   def calculateSlope(prices: Seq[Price]): Unit = {
     val lastPrice: Price = prices.head
     val fromTime = lastPrice.time.minusSeconds(secondsToCalculateAverage)
     val (values, _) = prices.partition(_.time.isAfter(fromTime))
-    val averagePrice = values
-      .map(price => {
-        val normPrice = (price.asks.head.price.value.toDouble + price.bids.head.price.value.toDouble) / 2
-        normPrice
-      })
-      .sum / values.length
-    val diverge = (meanPrice(lastPrice) - averagePrice).toPips
-    if (diverge.abs > divergenceThreshold && openOrders.isEmpty) {
-      val positionType = if (diverge > 0) LongPosition else ShortPosition
-      val order = Order((positionType == LongPosition) ? lastPrice.asks.head.price.value | lastPrice.bids.head.price.value, lastPrice.time, defaultTakeProfit, positionType, None)
-      openOrders = order +: openOrders
+    if (openOrders.isEmpty && values.length >= 2 && spread(lastPrice) <= 15) {
+      val diverge = pips(avg(values.head) - avg(values.last))
+      def positives = values.sliding(2).forall { case now +: past +: _ => pips(avg(now) - avg(past)) >= distanceBetweenPrices } && diverge >= divergenceThreshold
+      def negatives = values.sliding(2).forall { case now +: past +: _ => pips(avg(past) - avg(now)) >= distanceBetweenPrices } && diverge <= divergenceThreshold
+      val positionTypeOption = if (positives) Option(ShortPosition) else if (negatives) Option(LongPosition) else None
+
+      openOrders = positionTypeOption.map { positionType =>
+        val order = Order((positionType == LongPosition) ? lastPrice.asks.head.price.value | lastPrice.bids.head.price.value, lastPrice.time, defaultTakeProfit, positionType, None)
+        println(s"Opened $positionType order at ${lastPrice.time}")
+        order
+      }.toList ++ openOrders
     }
+    if (openOrders.nonEmpty) {
+      val ordersToClose = openOrders.filter(_.closeOrder(lastPrice))
+      if (ordersToClose.nonEmpty) {
+        val justClosedOrders = ordersToClose.map(_.copy(closedPrice = Option(lastPrice), closedAt = Option(lastPrice.time)))
+        closedOrders = closedOrders ++ justClosedOrders
+        openOrders = openOrders.filterNot(ordersToClose.contains)
 
-    val ordersToClose = openOrders.filter(_.closeOrder(lastPrice))
-    val justClosedOrders = ordersToClose.map(_.copy(closedPrice = Option(lastPrice), closedAt = Option(lastPrice.time)))
-    closedOrders = closedOrders ++ justClosedOrders
-    openOrders = openOrders.filterNot(ordersToClose.contains)
+        justClosedOrders.foreach { order =>
+          println(s"Take profit ${order.positionType}, open price ${order.creationPrice} at ${order.creationDate}, close price ${order.closedAtPrice} at ${order.closedAt.getOrElse("")}, profit ${order.profit}, duration ${order.orderDuration} minutes, total profit ${closedOrders.map(_.profit).sum}")
+        }
+      }
 
-    justClosedOrders.foreach { order =>
-      println(s"Closed ${order.positionType}, open price ${order.creationPrice} at ${order.creationDate}, close price ${order.closedAtPrice} at ${order.closedAt.getOrElse("")}, profit ${order.profit}, duration ${order.orderDuration} hours, total profit ${closedOrders.map(_.profit).sum}")
+      def staleOrders = openOrders.filter(_.orderDuration(lastPrice.time) >= maxMinutesToWait).toSet
+      def stopLoss = openOrders.filter(_.profit(lastPrice) < defaultStopLoss).toSet
+      val outdatedOrders: Set[Order] = staleOrders ++ stopLoss
+      if (outdatedOrders.nonEmpty) {
+        val justClosedOrders = outdatedOrders.map(_.copy(closedPrice = Option(lastPrice), closedAt = Option(lastPrice.time)))
+        closedOrders = closedOrders ++ justClosedOrders
+        openOrders = openOrders.filterNot(outdatedOrders.contains)
+
+        justClosedOrders.foreach { order =>
+          println(s"Stop loss ${order.positionType}, open price ${order.creationPrice} at ${order.creationDate}, close price ${order.closedAtPrice} at ${order.closedAt.getOrElse("")}, profit ${order.profit}, duration ${order.orderDuration} minutes, total profit ${closedOrders.map(_.profit).sum}")
+        }
+      }
     }
   }
 

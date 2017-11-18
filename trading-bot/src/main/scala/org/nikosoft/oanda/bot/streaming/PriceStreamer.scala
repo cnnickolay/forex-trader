@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.kafka.ProducerSettings
 import akka.kafka.scaladsl.Producer
 import akka.stream.scaladsl.{Broadcast, Flow, Framing, GraphDSL, RunnableGraph, Sink, Source}
-import akka.stream.{ActorMaterializer, ClosedShape}
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings, ClosedShape, Supervision}
 import akka.util.ByteString
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSerializer}
@@ -18,13 +18,19 @@ import org.nikosoft.oanda.api.ApiModel.PricingModel.Price
 import org.nikosoft.oanda.api.ApiModel.PrimitivesModel.InstrumentName
 import org.nikosoft.oanda.api.JsonSerializers
 
-import scala.concurrent.duration.DurationDouble
 import scala.util.Success
 
 object PriceStreamer extends App {
 
+  val decider: Supervision.Decider = {
+    case t: Throwable =>
+      println(t)
+      Supervision.Resume
+    case _ => Supervision.Resume
+  }
+
   implicit val actorSystem = ActorSystem("streamer")
-  implicit val materializer = ActorMaterializer()
+  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(actorSystem).withSupervisionStrategy(decider))
 
   implicit val formats = JsonSerializers.formats
 
@@ -43,8 +49,8 @@ object PriceStreamer extends App {
 
   val request = HttpRequest(uri = url(eurUsd), headers = List(RawHeader("Authorization", GlobalProperties.OandaToken)))
 
-  val source = Source//(Stream.from(1).map(_ => request -> 1))
-    .tick(0.seconds, 1.hour, request -> 1)
+  val source = Source(Stream.from(1).map(request -> _))
+//    .tick(0.seconds, 1.hour, request -> 1)
     .via(Http().cachedHostConnectionPoolHttps(host = "stream-fxtrade.oanda.com"))
     .collect { case (Success(response), _) => response }
     .flatMapConcat(_.entity.dataBytes)
